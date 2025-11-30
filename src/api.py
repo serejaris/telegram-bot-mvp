@@ -27,11 +27,19 @@ def parse_submission(text: str) -> dict | None:
     Returns:
         Словарь с данными проекта или None если формат не совпадает.
     """
-    pattern = r'Название:\s*(.+?)\s*\nДисциплина:\s*(.+?)\s*\nСсылка:\s*(.+?)\s*\nО\s*чём\s*проект:\s*(.+)'
+    # Гибкий паттерн учитывающий вариации:
+    # - "О чем" и "О чём"
+    # - Пробелы перед двоеточием: "Название :"
+    # - Тире вместо двоеточия: "Дисциплина -"
+    # - Опечатки: "Сссылка"
+    pattern = r'Название\s*[:]\s*(.+?)\s*\nДисциплина\s*[:\-]\s*(.+?)\s*\nС+сылка\s*[:]\s*(.+?)\s*\nО\s*чё?м\s*проект\s*[:]\s*(.+)'
     match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
     if match:
+        title = match.group(1).strip()
+        if not title:  # Пропускаем если название пустое
+            return None
         return {
-            "title": match.group(1).strip(),
+            "title": title,
             "discipline": match.group(2).strip().lower(),
             "link": match.group(3).strip(),
             "description": match.group(4).strip()
