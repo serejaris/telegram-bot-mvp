@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 # Глобальный пул соединений к базе данных
 DB_POOL: Optional[AsyncConnectionPool] = None
 
+# Target chat ID for public API
+PUBLIC_CHAT_ID = -1003339826329
+
 
 async def create_tables():
     """Создает необходимые таблицы в базе данных, если они не существуют."""
@@ -217,11 +220,60 @@ async def health_check(request):
         }, status=500)
 
 
+async def get_chat_history(request):
+    """Public API endpoint to get chat history for the configured chat."""
+    try:
+        async with DB_POOL.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("""
+                    SELECT
+                        m.message_id,
+                        m.text,
+                        m.sent_at,
+                        u.first_name,
+                        u.last_name,
+                        u.username
+                    FROM messages m
+                    LEFT JOIN users u ON m.user_id = u.id
+                    WHERE m.chat_id = %s
+                    ORDER BY m.sent_at ASC
+                """, (PUBLIC_CHAT_ID,))
+
+                rows = await cur.fetchall()
+
+                messages = []
+                for row in rows:
+                    messages.append({
+                        "message_id": row[0],
+                        "text": row[1],
+                        "sent_at": row[2].isoformat() if row[2] else None,
+                        "user": {
+                            "first_name": row[3],
+                            "last_name": row[4],
+                            "username": row[5]
+                        }
+                    })
+
+                return web.json_response({
+                    "chat_id": PUBLIC_CHAT_ID,
+                    "total_messages": len(messages),
+                    "messages": messages
+                })
+
+    except Exception as e:
+        logger.error(f"Failed to get chat history: {e}")
+        return web.json_response({
+            "error": "Failed to retrieve chat history",
+            "details": str(e)
+        }, status=500)
+
+
 async def start_health_server(port: int):
     """Запускает HTTP сервер для healthcheck."""
     app = web.Application()
     app.router.add_get('/health', health_check)
     app.router.add_get('/', health_check)  # Railway может проверять корневой путь
+    app.router.add_get('/api/messages', get_chat_history)
     
     runner = web.AppRunner(app)
     await runner.setup()
