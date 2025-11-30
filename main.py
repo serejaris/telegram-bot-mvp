@@ -254,18 +254,25 @@ async def get_chat_history(request):
                         }
                     })
 
-                return web.json_response({
-                    "chat_id": PUBLIC_CHAT_ID,
-                    "total_messages": len(messages),
-                    "messages": messages
-                })
+                return web.json_response(
+                    {
+                        "chat_id": PUBLIC_CHAT_ID,
+                        "total_messages": len(messages),
+                        "messages": messages
+                    },
+                    dumps=lambda x: json.dumps(x, ensure_ascii=False)
+                )
 
     except Exception as e:
         logger.error(f"Failed to get chat history: {e}")
-        return web.json_response({
-            "error": "Failed to retrieve chat history",
-            "details": str(e)
-        }, status=500)
+        return web.json_response(
+            {
+                "error": "Failed to retrieve chat history",
+                "details": str(e)
+            },
+            status=500,
+            dumps=lambda x: json.dumps(x, ensure_ascii=False)
+        )
 
 
 async def start_health_server(port: int):
