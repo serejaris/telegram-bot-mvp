@@ -33,14 +33,11 @@ def parse_submission(text: str) -> dict | None:
     # - Тире вместо двоеточия: "Дисциплина -"
     # - Опечатки: "Сссылка"
     # - Множественные переносы строк между полями
-    pattern = r'Название\s*[:]\s*(.+?)\s*\n+Дисциплина\s*[:\-]\s*(.+?)\s*\n+С+сылка\s*[:]\s*(.+?)\s*\n+О\s*ч[её]м\s*проект\s*[:]\s*(.+)'
+    pattern = r'Название\s*[:]\s*(.*?)\s*\n+Дисциплина\s*[:\-]\s*(.+?)\s*\n+С+сылка\s*[:]\s*(.+?)\s*\n+О\s*ч[её]м\s*проект\s*[:]\s*(.+)'
     match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
     if match:
-        title = match.group(1).strip()
-        if not title:  # Пропускаем если название пустое
-            return None
         return {
-            "title": title,
+            "title": match.group(1).strip() or None,
             "discipline": match.group(2).strip().lower(),
             "link": match.group(3).strip(),
             "description": match.group(4).strip()
