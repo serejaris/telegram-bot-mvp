@@ -88,6 +88,14 @@ def create_application(config: Config, pool: AsyncConnectionPool) -> Application
         )
     )
 
+    # Обработчик редактирования сообщений
+    application.add_handler(
+        MessageHandler(
+            filters.UpdateType.EDITED_MESSAGE & filters.TEXT,
+            message_handler
+        )
+    )
+
     application.add_error_handler(error_handler)
 
     return application

@@ -157,7 +157,9 @@ async def save_message(cursor: Any, message: Message) -> None:
     await cursor.execute("""
         INSERT INTO messages (message_id, chat_id, user_id, text, sent_at, raw_message)
         VALUES (%s, %s, %s, %s, %s, %s)
-        ON CONFLICT (chat_id, message_id) DO NOTHING;
+        ON CONFLICT (chat_id, message_id) DO UPDATE SET
+            text = EXCLUDED.text,
+            raw_message = EXCLUDED.raw_message;
     """, (
         message.message_id,
         message.chat_id,
