@@ -16,6 +16,22 @@ from .database import check_connection, get_chat_messages
 
 logger = logging.getLogger(__name__)
 
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+}
+
+
+@web.middleware
+async def cors_middleware(request: web.Request, handler):
+    """Добавляет CORS заголовки ко всем ответам."""
+    if request.method == "OPTIONS":
+        return web.Response(headers=CORS_HEADERS)
+    response = await handler(request)
+    response.headers.update(CORS_HEADERS)
+    return response
+
 
 def parse_submission(text: str) -> dict | None:
     """
@@ -179,7 +195,7 @@ def create_app(pool: AsyncConnectionPool, config: Config) -> web.Application:
     Returns:
         Настроенное aiohttp приложение.
     """
-    app = web.Application()
+    app = web.Application(middlewares=[cors_middleware])
 
     health_handler = create_health_handler(pool)
     chat_history_handler = create_chat_history_handler(pool, config.public_chat_id)
