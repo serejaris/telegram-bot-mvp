@@ -259,6 +259,7 @@ async def dashboard(request: web.Request):
     chats = await get_dashboard_data()
 
     return {
+        "request": request,
         "chats": chats,
     }
 
@@ -268,7 +269,7 @@ async def dashboard(request: web.Request):
 async def chats_page(request: web.Request):
     """Страница списка чатов."""
     chats = await get_chats_with_stats()
-    return {"chats": chats}
+    return {"request": request, "chats": chats}
 
 
 @require_auth
@@ -288,6 +289,7 @@ async def chat_messages_page(request: web.Request):
     messages = await get_chat_messages(chat_id, limit, offset, message_type)
     
     return {
+        "request": request,
         "chat": chat,
         "messages": messages,
         "page": page,
@@ -308,6 +310,7 @@ async def users_page(request: web.Request):
     users = await get_users(limit, offset)
     
     return {
+        "request": request,
         "users": users,
         "page": page,
         "has_next": len(users) == limit,
