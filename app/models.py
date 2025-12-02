@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
-from telegram import User, Chat, Message
+from telegram import User, Chat, Message, MessageOriginChat, MessageOriginChannel
 
 from .database import get_cursor, get_connection
 
@@ -176,6 +176,26 @@ def detect_message_type(msg: Message) -> str:
         return "other"
 
 
+def get_forward_chat_id(msg: Message) -> Optional[int]:
+    """Извлекает ID чата-источника для пересланных сообщений.
+    
+    В python-telegram-bot v21+ forward_from_chat заменён на forward_origin.
+    """
+    if not msg.forward_origin:
+        return None
+    
+    # MessageOriginChat - сообщение переслано от имени чата
+    if isinstance(msg.forward_origin, MessageOriginChat):
+        return msg.forward_origin.sender_chat.id
+    
+    # MessageOriginChannel - сообщение переслано из канала
+    if isinstance(msg.forward_origin, MessageOriginChannel):
+        return msg.forward_origin.chat.id
+    
+    # MessageOriginUser, MessageOriginHiddenUser - нет chat ID
+    return None
+
+
 async def save_user(user: User):
     """Сохраняет или обновляет пользователя."""
     async with get_cursor() as cur:
@@ -231,7 +251,7 @@ async def save_message(msg: Message, is_edit: bool = False):
     text_content = msg.text or None
     caption = msg.caption or None
     reply_to_id = msg.reply_to_message.message_id if msg.reply_to_message else None
-    forward_chat_id = msg.forward_from_chat.id if msg.forward_from_chat else None
+    forward_chat_id = get_forward_chat_id(msg)
     
     async with get_cursor() as cur:
         if is_edit:

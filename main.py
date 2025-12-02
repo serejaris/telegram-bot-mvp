@@ -5,7 +5,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.config import get_config
 from app.database import init_pool, close_pool
@@ -18,7 +18,7 @@ class JSONFormatter(logging.Formatter):
     """JSON formatter для структурированных логов (удобно для Railway)."""
     def format(self, record):
         log_obj = {
-            "timestamp": datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage()
