@@ -12,6 +12,7 @@ import aiohttp_jinja2
 import jinja2
 
 from ..config import get_config
+
 from ..database import get_cursor
 from ..models import (
     get_stats,
@@ -27,6 +28,27 @@ from ..services.summary import generate_chat_summary
 logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+@web.middleware
+async def cors_middleware(request: web.Request, handler):
+    """CORS middleware for API endpoints."""
+    # Handle preflight OPTIONS requests
+    if request.method == "OPTIONS":
+        response = web.Response()
+    else:
+        try:
+            response = await handler(request)
+        except web.HTTPException as ex:
+            response = ex
+
+    # Add CORS headers (allow all origins)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Max-Age"] = "86400"
+
+    return response
 
 
 def json_response(data, **kwargs):
@@ -320,7 +342,7 @@ async def users_page(request: web.Request):
 
 def create_web_app() -> web.Application:
     """Создаёт и настраивает веб-приложение."""
-    app = web.Application()
+    app = web.Application(middlewares=[cors_middleware])
     
     # Настройка Jinja2
     aiohttp_jinja2.setup(
@@ -343,6 +365,9 @@ def create_web_app() -> web.Application:
     app.router.add_get("/api/chats/{chat_id}/messages/daily", api_chat_messages_daily)
     app.router.add_get("/api/dashboard", api_dashboard)
     app.router.add_post("/api/chats/{chat_id}/summary", api_chat_summary)
+
+    # CORS preflight handlers
+    app.router.add_route("OPTIONS", "/api/{path:.*}", lambda r: web.Response())
     
     logger.info("Web application created")
     return app
