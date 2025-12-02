@@ -291,16 +291,30 @@
     /* ─── Hover: content readability ─── */
     .chat-card:hover .last-message-text,
     .chat-card:hover .last-message-meta .author,
-    .chat-card:hover .top-user-name,
-    .chat-card:hover .api-path {
+    .chat-card:hover .top-user-name {
         color: var(--fg);
         transition: color 0.15s;
     }
 
-    .chat-card:hover .top-user-count,
-    .chat-card:hover .api-method {
+    .chat-card:hover .top-user-count {
         color: var(--dim);
         transition: color 0.15s;
+    }
+
+    /* ─── API row hover ─── */
+    .api-row {
+        transition: all 0.15s;
+    }
+
+    .api-row:hover .api-method,
+    .api-row:hover .api-path {
+        color: var(--fg);
+    }
+
+    .api-row:hover .copy-btn,
+    .api-row:hover .dl-btn {
+        color: var(--fg);
+        border-color: var(--dim);
     }
 
     /* ─── Download button ─── */
