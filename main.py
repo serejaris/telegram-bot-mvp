@@ -18,7 +18,7 @@ class JSONFormatter(logging.Formatter):
     """JSON formatter для структурированных логов (удобно для Railway)."""
     def format(self, record):
         log_obj = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(datetime.timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage()

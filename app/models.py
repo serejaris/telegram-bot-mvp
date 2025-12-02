@@ -57,11 +57,10 @@ CREATE TABLE IF NOT EXISTS messages (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- Индексы для оптимизации запросов
+-- Индексы для оптимизации запросов (кроме message_type - создаётся после миграций)
 CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_sent_at ON messages(sent_at);
-CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(message_type);
 CREATE INDEX IF NOT EXISTS idx_chats_username ON chats(username) WHERE username IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL;
 """
@@ -135,8 +134,14 @@ async def run_migrations():
 
 async def init_database():
     """Инициализирует базу данных: создаёт таблицы и запускает миграции."""
+    # Сначала создаём базовые таблицы
     await create_tables()
+    # Затем запускаем миграции (добавляют новые колонки)
     await run_migrations()
+    # Создаём индекс на message_type после миграций
+    async with get_cursor() as cur:
+        await cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(message_type);")
+        logger.info("Message type index created/verified")
 
 
 def detect_message_type(msg: Message) -> str:
