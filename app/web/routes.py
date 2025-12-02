@@ -1,6 +1,7 @@
 """Роуты веб-приложения: админка и API."""
 
 import base64
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +25,15 @@ from ..models import (
 logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+def json_response(data, **kwargs):
+    """JSON response с поддержкой Cyrillic (ensure_ascii=False)."""
+    return web.json_response(
+        data,
+        dumps=lambda x: json.dumps(x, ensure_ascii=False),
+        **kwargs
+    )
 
 
 def check_auth(request: web.Request) -> bool:
@@ -70,7 +80,7 @@ async def health_check(request: web.Request) -> web.Response:
             result = await cur.fetchone()
         
         if result and result[0] == 1:
-            return web.json_response({
+            return json_response({
                 "status": "healthy",
                 "database": "connected",
                 "timestamp": datetime.utcnow().isoformat() + "Z"
@@ -78,7 +88,7 @@ async def health_check(request: web.Request) -> web.Response:
     except Exception as e:
         logger.error(f"Health check failed: {e}")
     
-    return web.json_response({
+    return json_response({
         "status": "unhealthy",
         "database": "disconnected",
         "timestamp": datetime.utcnow().isoformat() + "Z"
@@ -92,7 +102,7 @@ async def api_stats(request: web.Request) -> web.Response:
     """API: общая статистика."""
     try:
         stats = await get_stats()
-        return web.json_response({
+        return json_response({
             "total_chats": stats.total_chats,
             "total_users": stats.total_users,
             "total_messages": stats.total_messages,
@@ -101,7 +111,7 @@ async def api_stats(request: web.Request) -> web.Response:
         })
     except Exception as e:
         logger.error(f"API stats error: {e}")
-        return web.json_response({"error": str(e)}, status=500)
+        return json_response({"error": str(e)}, status=500)
 
 
 @require_auth
@@ -109,7 +119,7 @@ async def api_chats(request: web.Request) -> web.Response:
     """API: список чатов."""
     try:
         chats = await get_chats_with_stats()
-        return web.json_response([
+        return json_response([
             {
                 "id": c.id,
                 "type": c.type,
@@ -123,7 +133,7 @@ async def api_chats(request: web.Request) -> web.Response:
         ])
     except Exception as e:
         logger.error(f"API chats error: {e}")
-        return web.json_response({"error": str(e)}, status=500)
+        return json_response({"error": str(e)}, status=500)
 
 
 @require_auth
@@ -144,10 +154,10 @@ async def api_chat_messages(request: web.Request) -> web.Response:
             if msg["edited_at"]:
                 msg["edited_at"] = msg["edited_at"].isoformat()
         
-        return web.json_response(messages)
+        return json_response(messages)
     except Exception as e:
         logger.error(f"API chat messages error: {e}")
-        return web.json_response({"error": str(e)}, status=500)
+        return json_response({"error": str(e)}, status=500)
 
 
 @require_auth
@@ -158,7 +168,7 @@ async def api_chat_messages_daily(request: web.Request) -> web.Response:
         date_str = request.query.get("date")  # format: YYYY-MM-DD
         
         if not date_str:
-            return web.json_response({"error": "date parameter required (YYYY-MM-DD)"}, status=400)
+            return json_response({"error": "date parameter required (YYYY-MM-DD)"}, status=400)
         
         messages = await get_chat_messages_by_date(chat_id, date_str)
         
@@ -169,7 +179,7 @@ async def api_chat_messages_daily(request: web.Request) -> web.Response:
             if msg["edited_at"]:
                 msg["edited_at"] = msg["edited_at"].isoformat()
         
-        return web.json_response({
+        return json_response({
             "chat_id": chat_id,
             "date": date_str,
             "timezone": "UTC+3",
@@ -177,10 +187,10 @@ async def api_chat_messages_daily(request: web.Request) -> web.Response:
             "messages": messages,
         })
     except ValueError:
-        return web.json_response({"error": "invalid chat_id or date format"}, status=400)
+        return json_response({"error": "invalid chat_id or date format"}, status=400)
     except Exception as e:
         logger.error(f"API daily messages error: {e}")
-        return web.json_response({"error": str(e)}, status=500)
+        return json_response({"error": str(e)}, status=500)
 
 
 # ========== HTML Pages ==========
