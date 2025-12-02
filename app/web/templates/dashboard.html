@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - TG Bot Admin{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="value">{{ stats.total_messages }}</div>
+        <div class="label">Total Messages</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.total_chats }}</div>
+        <div class="label">Chats</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.total_users }}</div>
+        <div class="label">Users</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ stats.messages_today }}</div>
+        <div class="label">Messages Today</div>
+    </div>
+</div>
+
+{% if stats.messages_by_type %}
+<h2>Messages by Type</h2>
+<div class="stats-grid">
+    {% for type, count in stats.messages_by_type.items() %}
+    <div class="stat-card">
+        <div class="value">{{ count }}</div>
+        <div class="label">{{ type }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h2>Top Chats</h2>
+{% if chats %}
+<table>
+    <thead>
+        <tr>
+            <th>Chat</th>
+            <th>Type</th>
+            <th>Messages</th>
+            <th>Users</th>
+            <th>Last Activity</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for chat in chats %}
+        <tr>
+            <td>
+                <a href="/chats/{{ chat.id }}">
+                    {{ chat.title or chat.username or chat.id }}
+                </a>
+            </td>
+            <td>{{ chat.type }}</td>
+            <td>{{ chat.message_count }}</td>
+            <td>{{ chat.user_count }}</td>
+            <td>{{ chat.last_message_at.strftime('%Y-%m-%d %H:%M') if chat.last_message_at else '-' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p style="margin-top: 15px;"><a href="/chats">View all chats →</a></p>
+{% else %}
+<div class="empty-state">
+    <p>No chats yet. Add the bot to a group to start collecting messages.</p>
+</div>
+{% endif %}
+{% endblock %}

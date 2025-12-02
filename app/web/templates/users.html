@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Users - TG Bot Admin{% endblock %}
+
+{% block content %}
+<h1>Users</h1>
+
+{% if users %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Username</th>
+            <th>Messages</th>
+            <th>Language</th>
+            <th>First Seen</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td><code>{{ user.id }}</code></td>
+            <td>
+                {{ user.first_name or '' }} {{ user.last_name or '' }}
+                {% if user.is_premium %}<span class="premium-badge">Premium</span>{% endif %}
+                {% if user.is_bot %}<span class="badge badge-other">Bot</span>{% endif %}
+            </td>
+            <td>
+                {% if user.username %}
+                <a href="https://t.me/{{ user.username }}" target="_blank">@{{ user.username }}</a>
+                {% else %}
+                —
+                {% endif %}
+            </td>
+            <td>{{ user.message_count }}</td>
+            <td>{{ user.language_code or '—' }}</td>
+            <td>{{ user.first_seen_at.strftime('%Y-%m-%d') }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="pagination">
+    {% if has_prev %}
+    <a href="/users?page={{ page - 1 }}">← Previous</a>
+    {% else %}
+    <span>← Previous</span>
+    {% endif %}
+    
+    <span style="color: #fff;">Page {{ page }}</span>
+    
+    {% if has_next %}
+    <a href="/users?page={{ page + 1 }}">Next →</a>
+    {% else %}
+    <span>Next →</span>
+    {% endif %}
+</div>
+{% else %}
+<div class="empty-state">
+    <p>No users yet.</p>
+</div>
+{% endif %}
+{% endblock %}
