@@ -14,13 +14,15 @@ import jinja2
 from ..config import get_config
 from ..database import get_cursor
 from ..models import (
-    get_stats, 
-    get_chats_with_stats, 
+    get_stats,
+    get_chats_with_stats,
     get_chat_messages,
     get_chat_messages_by_date,
     get_chat_by_id,
     get_users,
+    get_dashboard_data,
 )
+from ..services.summary import generate_chat_summary
 
 logger = logging.getLogger(__name__)
 
@@ -193,18 +195,71 @@ async def api_chat_messages_daily(request: web.Request) -> web.Response:
         return json_response({"error": str(e)}, status=500)
 
 
+@require_auth
+async def api_dashboard(request: web.Request) -> web.Response:
+    """API: данные для дашборда."""
+    try:
+        chats = await get_dashboard_data()
+        config = get_config()
+
+        return json_response({
+            "chats": [
+                {
+                    "id": c.id,
+                    "title": c.title or f"Chat {c.id}",
+                    "total_messages": c.total_messages,
+                    "today_messages": c.today_messages,
+                    "last_message": {
+                        "text": c.last_message_text[:100] if c.last_message_text else None,
+                        "author": c.last_message_author,
+                        "sent_at": c.last_message_at.isoformat() if c.last_message_at else None,
+                    } if c.last_message_text else None,
+                    "top_users_week": c.top_users,
+                }
+                for c in chats
+            ],
+            "has_openrouter": config.has_openrouter,
+        })
+    except Exception as e:
+        logger.error(f"API dashboard error: {e}")
+        return json_response({"error": str(e)}, status=500)
+
+
+@require_auth
+async def api_chat_summary(request: web.Request) -> web.Response:
+    """API: генерация саммари для чата."""
+    try:
+        chat_id = int(request.match_info["chat_id"])
+
+        config = get_config()
+        if not config.has_openrouter:
+            return json_response({
+                "success": False,
+                "error": "OpenRouter API не настроен",
+            }, status=503)
+
+        result = await generate_chat_summary(chat_id)
+
+        status = 200 if result["success"] else 400
+        return json_response(result, status=status)
+
+    except ValueError:
+        return json_response({"error": "invalid chat_id"}, status=400)
+    except Exception as e:
+        logger.error(f"API summary error: {e}")
+        return json_response({"error": str(e)}, status=500)
+
+
 # ========== HTML Pages ==========
 
 @require_auth
 @aiohttp_jinja2.template("dashboard.html")
 async def dashboard(request: web.Request):
     """Главная страница дашборда."""
-    stats = await get_stats()
-    chats = await get_chats_with_stats()
-    
+    chats = await get_dashboard_data()
+
     return {
-        "stats": stats,
-        "chats": chats[:10],  # Топ 10 чатов
+        "chats": chats,
     }
 
 
@@ -283,6 +338,8 @@ def create_web_app() -> web.Application:
     app.router.add_get("/api/chats", api_chats)
     app.router.add_get("/api/chats/{chat_id}/messages", api_chat_messages)
     app.router.add_get("/api/chats/{chat_id}/messages/daily", api_chat_messages_daily)
+    app.router.add_get("/api/dashboard", api_dashboard)
+    app.router.add_post("/api/chats/{chat_id}/summary", api_chat_summary)
     
     logger.info("Web application created")
     return app

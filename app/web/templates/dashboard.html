@@ -1,73 +1,522 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - TG Bot Admin{% endblock %}
+{% block title %}Дашборд чатов{% endblock %}
 
 {% block content %}
-<h1>Dashboard</h1>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700&display=swap');
 
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="value">{{ stats.total_messages }}</div>
-        <div class="label">Total Messages</div>
-    </div>
-    <div class="stat-card">
-        <div class="value">{{ stats.total_chats }}</div>
-        <div class="label">Chats</div>
-    </div>
-    <div class="stat-card">
-        <div class="value">{{ stats.total_users }}</div>
-        <div class="label">Users</div>
-    </div>
-    <div class="stat-card">
-        <div class="value">{{ stats.messages_today }}</div>
-        <div class="label">Messages Today</div>
-    </div>
+    .dashboard-header {
+        margin-bottom: 48px;
+    }
+
+    .dashboard-header h1 {
+        font-family: 'Manrope', sans-serif;
+        font-size: 2.5rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        background: linear-gradient(135deg, #fff 0%, #a0a0a0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 8px;
+    }
+
+    .dashboard-header .subtitle {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        color: #666;
+        letter-spacing: 0.02em;
+    }
+
+    .chats-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .chat-card {
+        background: linear-gradient(145deg, #1a1a1a 0%, #141414 100%);
+        border: 1px solid #2a2a2a;
+        border-radius: 16px;
+        padding: 28px;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .chat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #0088cc, #00c6ff);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .chat-card:hover {
+        border-color: #3a3a3a;
+        transform: translateY(-2px);
+        box-shadow: 0 20px 40px rgba(0, 136, 204, 0.1);
+    }
+
+    .chat-card:hover::before {
+        opacity: 1;
+    }
+
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 20px;
+    }
+
+    .chat-title {
+        font-family: 'Manrope', sans-serif;
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: #fff;
+        margin: 0;
+        letter-spacing: -0.01em;
+    }
+
+    .chat-title a {
+        color: inherit;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+
+    .chat-title a:hover {
+        color: #0088cc;
+    }
+
+    .chat-stats {
+        display: flex;
+        gap: 16px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+    }
+
+    .stat-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #fff;
+    }
+
+    .stat-label {
+        font-size: 0.7rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .stat-item.today .stat-value {
+        color: #00c6ff;
+    }
+
+    .chat-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .chat-content {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .last-message {
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 12px;
+        padding: 16px;
+        border-left: 2px solid #333;
+    }
+
+    .last-message-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 10px;
+    }
+
+    .last-message-text {
+        font-family: 'Manrope', sans-serif;
+        font-size: 0.95rem;
+        color: #ccc;
+        line-height: 1.5;
+        margin-bottom: 8px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .last-message-meta {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        color: #555;
+    }
+
+    .last-message-meta .author {
+        color: #0088cc;
+    }
+
+    .top-users {
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 12px;
+        padding: 16px;
+    }
+
+    .top-users-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 12px;
+    }
+
+    .top-users-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .top-user {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 6px;
+        font-family: 'Manrope', sans-serif;
+        font-size: 0.85rem;
+    }
+
+    .top-user-rank {
+        width: 20px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        color: #555;
+    }
+
+    .top-user-name {
+        flex: 1;
+        color: #ddd;
+    }
+
+    .top-user-count {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+        color: #888;
+        padding: 2px 8px;
+        background: rgba(0, 136, 204, 0.1);
+        border-radius: 4px;
+    }
+
+    .chat-actions {
+        display: flex;
+        gap: 12px;
+        padding-top: 16px;
+        border-top: 1px solid #222;
+    }
+
+    .summary-btn {
+        font-family: 'Manrope', sans-serif;
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #0088cc 0%, #0066aa 100%);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .summary-btn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #00a0ee 0%, #0077bb 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 136, 204, 0.3);
+    }
+
+    .summary-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .summary-btn.loading {
+        pointer-events: none;
+    }
+
+    .summary-btn .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .summary-result {
+        margin-top: 16px;
+        padding: 20px;
+        background: linear-gradient(145deg, #0d1f2d 0%, #0a1520 100%);
+        border: 1px solid #1a3a4a;
+        border-radius: 12px;
+        display: none;
+    }
+
+    .summary-result.visible {
+        display: block;
+        animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .summary-result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #1a3a4a;
+    }
+
+    .summary-result-title {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        color: #00c6ff;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .summary-result-meta {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        color: #556;
+    }
+
+    .summary-result-content {
+        font-family: 'Manrope', sans-serif;
+        font-size: 0.9rem;
+        line-height: 1.7;
+        color: #ccc;
+        white-space: pre-wrap;
+    }
+
+    .summary-error {
+        color: #ff6b6b;
+        padding: 16px;
+        background: rgba(255, 107, 107, 0.1);
+        border: 1px solid rgba(255, 107, 107, 0.2);
+        border-radius: 8px;
+        font-family: 'Manrope', sans-serif;
+        font-size: 0.9rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 80px 40px;
+        background: linear-gradient(145deg, #1a1a1a 0%, #141414 100%);
+        border: 1px dashed #333;
+        border-radius: 16px;
+    }
+
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 20px;
+        opacity: 0.3;
+    }
+
+    .empty-state-text {
+        font-family: 'Manrope', sans-serif;
+        font-size: 1.1rem;
+        color: #666;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-hint {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+        color: #444;
+    }
+
+    .no-messages {
+        color: #555;
+        font-style: italic;
+        font-size: 0.9rem;
+    }
+
+    .no-openrouter {
+        display: none;
+    }
+</style>
+
+<div class="dashboard-header">
+    <h1>Дашборд чатов</h1>
+    <div class="subtitle">Мониторинг групповых чатов в реальном времени</div>
 </div>
 
-{% if stats.messages_by_type %}
-<h2>Messages by Type</h2>
-<div class="stats-grid">
-    {% for type, count in stats.messages_by_type.items() %}
-    <div class="stat-card">
-        <div class="value">{{ count }}</div>
-        <div class="label">{{ type }}</div>
+{% if chats %}
+<div class="chats-grid">
+    {% for chat in chats %}
+    <div class="chat-card" data-chat-id="{{ chat.id }}">
+        <div class="chat-header">
+            <h2 class="chat-title">
+                <a href="/chats/{{ chat.id }}">{{ chat.title or 'Chat ' ~ chat.id }}</a>
+            </h2>
+            <div class="chat-stats">
+                <div class="stat-item">
+                    <span class="stat-value">{{ chat.total_messages }}</span>
+                    <span class="stat-label">всего</span>
+                </div>
+                <div class="stat-item today">
+                    <span class="stat-value">{{ chat.today_messages }}</span>
+                    <span class="stat-label">сегодня</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-content">
+            <div class="last-message">
+                <div class="last-message-label">Последнее сообщение</div>
+                {% if chat.last_message_text %}
+                <div class="last-message-text">{{ chat.last_message_text[:150] }}{% if chat.last_message_text|length > 150 %}...{% endif %}</div>
+                <div class="last-message-meta">
+                    <span class="author">@{{ chat.last_message_author }}</span>
+                    · {{ chat.last_message_at.strftime('%d.%m %H:%M') if chat.last_message_at else '' }}
+                </div>
+                {% else %}
+                <div class="no-messages">Нет текстовых сообщений</div>
+                {% endif %}
+            </div>
+
+            <div class="top-users">
+                <div class="top-users-label">Топ за неделю</div>
+                {% if chat.top_users %}
+                <div class="top-users-list">
+                    {% for user in chat.top_users %}
+                    <div class="top-user">
+                        <span class="top-user-rank">{{ loop.index }}.</span>
+                        <span class="top-user-name">@{{ user.name }}</span>
+                        <span class="top-user-count">{{ user.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="no-messages">Нет активности за неделю</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="chat-actions">
+            <button class="summary-btn" onclick="getSummary({{ chat.id }}, this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 3v18M3 12h18"/>
+                </svg>
+                Саммари за сутки
+            </button>
+        </div>
+
+        <div class="summary-result" id="summary-{{ chat.id }}">
+            <div class="summary-result-header">
+                <span class="summary-result-title">AI-саммари</span>
+                <span class="summary-result-meta" id="summary-meta-{{ chat.id }}"></span>
+            </div>
+            <div class="summary-result-content" id="summary-content-{{ chat.id }}"></div>
+        </div>
     </div>
     {% endfor %}
 </div>
-{% endif %}
-
-<h2>Top Chats</h2>
-{% if chats %}
-<table>
-    <thead>
-        <tr>
-            <th>Chat</th>
-            <th>Type</th>
-            <th>Messages</th>
-            <th>Users</th>
-            <th>Last Activity</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for chat in chats %}
-        <tr>
-            <td>
-                <a href="/chats/{{ chat.id }}">
-                    {{ chat.title or chat.username or chat.id }}
-                </a>
-            </td>
-            <td>{{ chat.type }}</td>
-            <td>{{ chat.message_count }}</td>
-            <td>{{ chat.user_count }}</td>
-            <td>{{ chat.last_message_at.strftime('%Y-%m-%d %H:%M') if chat.last_message_at else '-' }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-<p style="margin-top: 15px;"><a href="/chats">View all chats →</a></p>
 {% else %}
 <div class="empty-state">
-    <p>No chats yet. Add the bot to a group to start collecting messages.</p>
+    <div class="empty-state-icon">💬</div>
+    <div class="empty-state-text">Пока нет чатов</div>
+    <div class="empty-state-hint">Добавьте бота в групповой чат для начала сбора сообщений</div>
 </div>
 {% endif %}
+
+<script>
+async function getSummary(chatId, button) {
+    const resultDiv = document.getElementById(`summary-${chatId}`);
+    const contentDiv = document.getElementById(`summary-content-${chatId}`);
+    const metaDiv = document.getElementById(`summary-meta-${chatId}`);
+
+    // Set loading state
+    const originalText = button.innerHTML;
+    button.innerHTML = '<div class="spinner"></div> Генерирую...';
+    button.classList.add('loading');
+    button.disabled = true;
+
+    // Hide previous result
+    resultDiv.classList.remove('visible');
+
+    try {
+        const response = await fetch(`/api/chats/${chatId}/summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            contentDiv.innerHTML = data.summary;
+            contentDiv.className = 'summary-result-content';
+            metaDiv.textContent = `${data.messages_count} сообщений · ${data.period}`;
+        } else {
+            contentDiv.innerHTML = data.error || 'Произошла ошибка';
+            contentDiv.className = 'summary-result-content summary-error';
+            metaDiv.textContent = '';
+        }
+
+        resultDiv.classList.add('visible');
+
+    } catch (error) {
+        contentDiv.innerHTML = 'Ошибка соединения. Попробуйте позже.';
+        contentDiv.className = 'summary-result-content summary-error';
+        metaDiv.textContent = '';
+        resultDiv.classList.add('visible');
+    } finally {
+        // Reset button
+        button.innerHTML = originalText;
+        button.classList.remove('loading');
+        button.disabled = false;
+    }
+}
+</script>
 {% endblock %}

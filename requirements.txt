@@ -9,3 +9,6 @@ psycopg-pool==3.2.2
 aiohttp==3.9.1
 aiohttp-jinja2==1.6
 Jinja2>=3.1.2
+
+# HTTP Client for OpenRouter API
+httpx>=0.27.0

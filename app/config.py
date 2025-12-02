@@ -8,15 +8,19 @@ from typing import Optional
 @dataclass
 class Config:
     """Конфигурация приложения."""
-    
+
     telegram_token: str
     database_url: str
     port: int = 8000
     log_level: str = "INFO"
-    
+
     # Опциональная базовая авторизация для админки
     admin_username: Optional[str] = None
     admin_password: Optional[str] = None
+
+    # OpenRouter API
+    openrouter_api_key: Optional[str] = None
+    openrouter_model: str = "openai/gpt-4o-mini"
     
     @classmethod
     def from_env(cls) -> "Config":
@@ -37,12 +41,19 @@ class Config:
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             admin_username=os.getenv("ADMIN_USERNAME"),
             admin_password=os.getenv("ADMIN_PASSWORD"),
+            openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
+            openrouter_model=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
         )
     
     @property
     def has_auth(self) -> bool:
         """Проверяет, настроена ли авторизация."""
         return bool(self.admin_username and self.admin_password)
+
+    @property
+    def has_openrouter(self) -> bool:
+        """Проверяет, настроен ли OpenRouter."""
+        return bool(self.openrouter_api_key)
 
 
 # Глобальный экземпляр конфигурации
