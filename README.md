@@ -2,6 +2,41 @@
 
 Этот бот представляет собой MVP (Minimum Viable Product) для сбора текстовых сообщений из групповых чатов Telegram и сохранения их в базу данных PostgreSQL.
 
+## API Endpoints
+
+### Health Check (без авторизации)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Проверка состояния сервиса и БД |
+
+### Web Pages (требуется Basic Auth, если настроен)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | Dashboard со статистикой |
+| GET | `/chats` | Список всех чатов |
+| GET | `/chats/{chat_id}` | Сообщения конкретного чата |
+| GET | `/users` | Список пользователей |
+
+### JSON API (требуется Basic Auth, если настроен)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/stats` | Общая статистика (чаты, пользователи, сообщения) |
+| GET | `/api/chats` | Список чатов с количеством сообщений |
+| GET | `/api/chats/{chat_id}/messages` | Сообщения чата (`?limit=100&offset=0&type=text`) |
+| GET | `/api/chats/{chat_id}/messages/daily` | Сообщения за день (`?date=YYYY-MM-DD`, UTC+3) |
+
+### Примеры запросов
+```bash
+# Health check
+curl https://your-domain.railway.app/health
+
+# API с авторизацией
+curl -u admin:password https://your-domain.railway.app/api/stats
+
+# Сообщения чата за день
+curl -u admin:password "https://your-domain.railway.app/api/chats/-1001234567890/messages/daily?date=2024-12-01"
+```
+
 ## Функциональность
 
 - Слушает все текстовые сообщения в групповых чатах
