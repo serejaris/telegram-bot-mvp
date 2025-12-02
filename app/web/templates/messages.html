@@ -1,32 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}{{ chat.title or chat.id }} - Messages{% endblock %}
+{% block title %}{{ chat.title or chat.id }} - messages{% endblock %}
 
 {% block content %}
-<h1>{{ chat.title or 'Chat ' ~ chat.id }}</h1>
-<p style="color: #888; margin-bottom: 20px;">
-    {% if chat.username %}@{{ chat.username }} · {% endif %}
-    {{ chat.type }} · ID: <code>{{ chat.id }}</code>
+<h1>{{ chat.title or 'chat_' ~ chat.id }}</h1>
+<p style="color: var(--dim); margin-bottom: 20px;">
+    {% if chat.username %}@{{ chat.username }} | {% endif %}
+    {{ chat.type }} | id: <code>{{ chat.id }}</code>
 </p>
 
 <div class="filter-bar">
-    <a href="/chats/{{ chat.id }}" {% if not message_type %}class="active"{% endif %}>All</a>
-    <a href="/chats/{{ chat.id }}?type=text" {% if message_type == 'text' %}class="active"{% endif %}>Text</a>
-    <a href="/chats/{{ chat.id }}?type=photo" {% if message_type == 'photo' %}class="active"{% endif %}>Photo</a>
-    <a href="/chats/{{ chat.id }}?type=video" {% if message_type == 'video' %}class="active"{% endif %}>Video</a>
-    <a href="/chats/{{ chat.id }}?type=sticker" {% if message_type == 'sticker' %}class="active"{% endif %}>Sticker</a>
-    <a href="/chats/{{ chat.id }}?type=document" {% if message_type == 'document' %}class="active"{% endif %}>Document</a>
+    <a href="/chats/{{ chat.id }}" {% if not message_type %}class="active"{% endif %}>[ all ]</a>
+    <a href="/chats/{{ chat.id }}?type=text" {% if message_type == 'text' %}class="active"{% endif %}>[ text ]</a>
+    <a href="/chats/{{ chat.id }}?type=photo" {% if message_type == 'photo' %}class="active"{% endif %}>[ photo ]</a>
+    <a href="/chats/{{ chat.id }}?type=video" {% if message_type == 'video' %}class="active"{% endif %}>[ video ]</a>
+    <a href="/chats/{{ chat.id }}?type=sticker" {% if message_type == 'sticker' %}class="active"{% endif %}>[ sticker ]</a>
+    <a href="/chats/{{ chat.id }}?type=document" {% if message_type == 'document' %}class="active"{% endif %}>[ doc ]</a>
 </div>
 
 {% if messages %}
 <table>
     <thead>
         <tr>
-            <th>Time</th>
-            <th>User</th>
-            <th>Type</th>
-            <th>Content</th>
-            <th>Reply To</th>
+            <th>time</th>
+            <th>user</th>
+            <th>type</th>
+            <th>content</th>
+            <th>reply</th>
         </tr>
     </thead>
     <tbody>
@@ -35,7 +35,7 @@
             <td>
                 {{ msg.sent_at.strftime('%Y-%m-%d %H:%M') }}
                 {% if msg.edited_at %}
-                <br><small style="color: #888;">edited {{ msg.edited_at.strftime('%H:%M') }}</small>
+                <br><small style="color: var(--muted);">*{{ msg.edited_at.strftime('%H:%M') }}</small>
                 {% endif %}
             </td>
             <td>
@@ -43,24 +43,24 @@
                 <div class="user-info">
                     <span class="name">{{ msg.user.first_name or '' }} {{ msg.user.last_name or '' }}</span>
                     {% if msg.user.username %}
-                    <span class="username">@{{ msg.user.username }}</span>
+                    <span class="username">{{ msg.user.username }}</span>
                     {% endif %}
                 </div>
                 {% else %}
-                <span style="color: #666;">Unknown</span>
+                <span style="color: var(--muted);">--</span>
                 {% endif %}
             </td>
             <td>
                 <span class="badge badge-{{ msg.message_type }}">{{ msg.message_type }}</span>
             </td>
             <td class="message-text">
-                {{ msg.text or msg.caption or '—' }}
+                {{ msg.text or msg.caption or '--' }}
             </td>
             <td>
                 {% if msg.reply_to_message_id %}
                 #{{ msg.reply_to_message_id }}
                 {% else %}
-                —
+                --
                 {% endif %}
             </td>
         </tr>
@@ -70,22 +70,22 @@
 
 <div class="pagination">
     {% if has_prev %}
-    <a href="/chats/{{ chat.id }}?page={{ page - 1 }}{% if message_type %}&type={{ message_type }}{% endif %}">← Previous</a>
+    <a href="/chats/{{ chat.id }}?page={{ page - 1 }}{% if message_type %}&type={{ message_type }}{% endif %}">[ < prev ]</a>
     {% else %}
-    <span>← Previous</span>
+    <span class="disabled">[ < prev ]</span>
     {% endif %}
-    
-    <span style="color: #fff;">Page {{ page }}</span>
-    
+
+    <span style="color: var(--fg);">page {{ page }}</span>
+
     {% if has_next %}
-    <a href="/chats/{{ chat.id }}?page={{ page + 1 }}{% if message_type %}&type={{ message_type }}{% endif %}">Next →</a>
+    <a href="/chats/{{ chat.id }}?page={{ page + 1 }}{% if message_type %}&type={{ message_type }}{% endif %}">[ next > ]</a>
     {% else %}
-    <span>Next →</span>
+    <span class="disabled">[ next > ]</span>
     {% endif %}
 </div>
 {% else %}
 <div class="empty-state">
-    <p>No messages {% if message_type %}of type "{{ message_type }}"{% endif %} in this chat.</p>
+    -- no messages {% if message_type %}of type "{{ message_type }}"{% endif %} --
 </div>
 {% endif %}
 {% endblock %}

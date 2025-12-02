@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Chats - TG Bot Admin{% endblock %}
+{% block title %}chats{% endblock %}
 
 {% block content %}
-<h1>All Chats</h1>
+<h1>chats</h1>
 
 {% if chats %}
 <table>
     <thead>
         <tr>
-            <th>ID</th>
-            <th>Title</th>
-            <th>Username</th>
-            <th>Type</th>
-            <th>Messages</th>
-            <th>Users</th>
-            <th>First Seen</th>
-            <th>Last Activity</th>
+            <th>id</th>
+            <th>title</th>
+            <th>username</th>
+            <th>type</th>
+            <th>msgs</th>
+            <th>users</th>
+            <th>first_seen</th>
+            <th>last_activity</th>
         </tr>
     </thead>
     <tbody>
@@ -24,29 +24,27 @@
         <tr>
             <td><code>{{ chat.id }}</code></td>
             <td>
-                <a href="/chats/{{ chat.id }}">
-                    {{ chat.title or '—' }}
-                </a>
+                <a href="/chats/{{ chat.id }}">{{ chat.title or '--' }}</a>
             </td>
             <td>
                 {% if chat.username %}
                 <a href="https://t.me/{{ chat.username }}" target="_blank">@{{ chat.username }}</a>
                 {% else %}
-                —
+                --
                 {% endif %}
             </td>
             <td>{{ chat.type }}</td>
             <td>{{ chat.message_count }}</td>
             <td>{{ chat.user_count }}</td>
             <td>{{ chat.first_seen_at.strftime('%Y-%m-%d') }}</td>
-            <td>{{ chat.last_message_at.strftime('%Y-%m-%d %H:%M') if chat.last_message_at else '—' }}</td>
+            <td>{{ chat.last_message_at.strftime('%Y-%m-%d %H:%M') if chat.last_message_at else '--' }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 {% else %}
 <div class="empty-state">
-    <p>No chats yet.</p>
+    -- no chats --
 </div>
 {% endif %}
 {% endblock %}

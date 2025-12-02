@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Users - TG Bot Admin{% endblock %}
+{% block title %}users{% endblock %}
 
 {% block content %}
-<h1>Users</h1>
+<h1>users</h1>
 
 {% if users %}
 <table>
     <thead>
         <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Username</th>
-            <th>Messages</th>
-            <th>Language</th>
-            <th>First Seen</th>
+            <th>id</th>
+            <th>name</th>
+            <th>username</th>
+            <th>msgs</th>
+            <th>lang</th>
+            <th>first_seen</th>
         </tr>
     </thead>
     <tbody>
@@ -23,18 +23,18 @@
             <td><code>{{ user.id }}</code></td>
             <td>
                 {{ user.first_name or '' }} {{ user.last_name or '' }}
-                {% if user.is_premium %}<span class="premium-badge">Premium</span>{% endif %}
-                {% if user.is_bot %}<span class="badge badge-other">Bot</span>{% endif %}
+                {% if user.is_premium %}<span class="premium-badge">PRO</span>{% endif %}
+                {% if user.is_bot %}<span class="badge badge-other">bot</span>{% endif %}
             </td>
             <td>
                 {% if user.username %}
                 <a href="https://t.me/{{ user.username }}" target="_blank">@{{ user.username }}</a>
                 {% else %}
-                —
+                --
                 {% endif %}
             </td>
             <td>{{ user.message_count }}</td>
-            <td>{{ user.language_code or '—' }}</td>
+            <td>{{ user.language_code or '--' }}</td>
             <td>{{ user.first_seen_at.strftime('%Y-%m-%d') }}</td>
         </tr>
         {% endfor %}
@@ -43,22 +43,22 @@
 
 <div class="pagination">
     {% if has_prev %}
-    <a href="/users?page={{ page - 1 }}">← Previous</a>
+    <a href="/users?page={{ page - 1 }}">[ < prev ]</a>
     {% else %}
-    <span>← Previous</span>
+    <span class="disabled">[ < prev ]</span>
     {% endif %}
-    
-    <span style="color: #fff;">Page {{ page }}</span>
-    
+
+    <span style="color: var(--fg);">page {{ page }}</span>
+
     {% if has_next %}
-    <a href="/users?page={{ page + 1 }}">Next →</a>
+    <a href="/users?page={{ page + 1 }}">[ next > ]</a>
     {% else %}
-    <span>Next →</span>
+    <span class="disabled">[ next > ]</span>
     {% endif %}
 </div>
 {% else %}
 <div class="empty-state">
-    <p>No users yet.</p>
+    -- no users --
 </div>
 {% endif %}
 {% endblock %}
