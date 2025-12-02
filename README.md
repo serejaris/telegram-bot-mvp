@@ -23,7 +23,9 @@
 | GET | `/api/stats` | Общая статистика (чаты, пользователи, сообщения) |
 | GET | `/api/chats` | Список чатов с количеством сообщений |
 | GET | `/api/chats/{chat_id}/messages` | Сообщения чата (`?limit=100&offset=0&type=text`) |
-| GET | `/api/chats/{chat_id}/messages/daily` | Сообщения за день (`?date=YYYY-MM-DD`, UTC+3) |
+| GET | `/api/chats/{chat_id}/messages/daily` | Сообщения за день (**обязательно**: `?date=YYYY-MM-DD`, UTC+3) |
+
+> **Примечание:** `chat_id` для групп/супергрупп всегда отрицательный (например, `-1001234567890`)
 
 ### Примеры запросов
 ```bash
