@@ -287,6 +287,36 @@
         font-style: italic;
         font-size: 0.85em;
     }
+
+    /* ─── Hover: content readability ─── */
+    .chat-card:hover .last-message-text,
+    .chat-card:hover .last-message-meta .author,
+    .chat-card:hover .top-user-name {
+        color: var(--fg);
+        transition: color 0.15s;
+    }
+
+    .chat-card:hover .top-user-count {
+        color: var(--dim);
+        transition: color 0.15s;
+    }
+
+    /* ─── Download button ─── */
+    .dl-btn {
+        cursor: pointer;
+        color: var(--dim);
+        border: 1px solid var(--border);
+        background: transparent;
+        padding: 2px 6px;
+        font-family: var(--font);
+        font-size: 0.85em;
+        transition: all 0.15s;
+    }
+
+    .dl-btn:hover {
+        color: var(--fg);
+        border-color: var(--fg);
+    }
 </style>
 {% endblock %}
 
@@ -364,6 +394,11 @@
                     <code class="api-path">/api/chats/{{ chat.id }}/summary</code>
                     <button class="copy-btn" onclick="copyToClipboard('/api/chats/{{ chat.id }}/summary', this)">[cp]</button>
                 </div>
+                <div class="api-row" style="margin-top: 8px;">
+                    <span class="api-method get">GET</span>
+                    <code class="api-path">/api/chats/{{ chat.id }}/messages/daily?date=today</code>
+                    <button class="dl-btn" onclick="downloadTodayJson({{ chat.id }}, this)">[dl json]</button>
+                </div>
             </div>
         </div>
 
@@ -393,6 +428,36 @@
 
 {% block scripts %}
 <script>
+async function downloadTodayJson(chatId, button) {
+    const today = new Date().toISOString().split('T')[0];
+    const url = `/api/chats/${chatId}/messages/daily?date=${today}`;
+
+    const originalText = button.textContent;
+    button.textContent = '[...]';
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const downloadUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `chat_${chatId}_${today}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+
+        button.textContent = '[ok]';
+        setTimeout(() => button.textContent = originalText, 1000);
+    } catch (error) {
+        button.textContent = '[err]';
+        setTimeout(() => button.textContent = originalText, 1000);
+    }
+}
+
 async function getSummary(chatId, button) {
     const resultDiv = document.getElementById(`summary-${chatId}`);
     const contentDiv = document.getElementById(`summary-content-${chatId}`);
