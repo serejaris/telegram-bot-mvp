@@ -405,6 +405,43 @@
     .placeholder::after {
         content: " --";
     }
+
+    /* ─── Export Tab ─── */
+    .export-container {
+        display: grid;
+        gap: 20px;
+        max-width: 400px;
+    }
+
+    .export-form {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .export-form label {
+        color: var(--dim);
+        font-size: 0.85em;
+    }
+
+    .date-input {
+        padding: 8px 12px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font);
+        font-size: 0.9em;
+    }
+
+    .date-input:focus {
+        outline: none;
+        border-color: var(--fg);
+    }
+
+    .export-hint {
+        color: var(--muted);
+        font-size: 0.8em;
+    }
 </style>
 {% endblock %}
 
@@ -420,6 +457,7 @@
     <button class="tab active" data-tab="messages">[ сообщения ]</button>
     <button class="tab" data-tab="analytics">[ аналитика ]</button>
     <button class="tab" data-tab="strategy">[ стратегия ]</button>
+    <button class="tab" data-tab="export">[ экспорт ]</button>
 </div>
 
 <!-- Messages Tab -->
@@ -569,6 +607,24 @@
 
         <div id="strategy-placeholder" class="placeholder">
             выберите период и нажмите "сгенерировать отчёт"
+        </div>
+    </div>
+</div>
+
+<!-- Export Tab -->
+<div id="tab-export" class="tab-content">
+    <div class="export-container">
+        <div class="export-form">
+            <label for="export-date">дата:</label>
+            <input type="date" id="export-date" class="date-input">
+        </div>
+
+        <button id="export-btn" class="generate-btn" onclick="downloadByDate()">
+            скачать JSON
+        </button>
+
+        <div class="export-hint">
+            экспорт за полный день (00:00–23:59) · UTC+3 (Москва)
         </div>
     </div>
 </div>
@@ -743,6 +799,57 @@
             .replace(/<p><\/p>/g, '')
             .replace(/<p>(<[uh])/g, '$1')
             .replace(/(<\/[uh][l2]>)<\/p>/g, '$1');
+    }
+
+    // Export: set default date to yesterday
+    (function initExportDate() {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        document.getElementById('export-date').value = yesterday;
+    })();
+
+    // Export: download JSON by selected date
+    async function downloadByDate() {
+        const dateInput = document.getElementById('export-date');
+        const date = dateInput.value;
+        const btn = document.getElementById('export-btn');
+
+        if (!date) {
+            alert('выберите дату');
+            return;
+        }
+
+        const originalText = btn.textContent;
+        btn.textContent = '...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(`/api/chats/${CHAT_ID}/messages/daily?date=${date}`);
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chat_${CHAT_ID}_${date}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            btn.textContent = 'ok';
+            setTimeout(() => btn.textContent = originalText, 1000);
+        } catch (e) {
+            btn.textContent = 'ошибка';
+            setTimeout(() => btn.textContent = originalText, 2000);
+            console.error('Export error:', e);
+        } finally {
+            btn.disabled = false;
+        }
     }
 </script>
 {% endblock %}
