@@ -24,6 +24,8 @@ from ..models import (
     get_dashboard_data,
 )
 from ..services.summary import generate_chat_summary
+from ..services.analytics import generate_chat_analytics
+from ..services.strategy import generate_content_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +274,63 @@ async def api_chat_summary(request: web.Request) -> web.Response:
         return json_response({"error": str(e)}, status=500)
 
 
+@require_auth
+async def api_chat_analytics(request: web.Request) -> web.Response:
+    """API: аналитика чата за неделю."""
+    try:
+        chat_id = int(request.match_info["chat_id"])
+
+        config = get_config()
+        if not config.has_openrouter:
+            return json_response({
+                "success": False,
+                "error": "OpenRouter API не настроен",
+            }, status=503)
+
+        result = await generate_chat_analytics(chat_id)
+
+        status = 200 if result["success"] else 400
+        return json_response(result, status=status)
+
+    except ValueError:
+        return json_response({"error": "invalid chat_id"}, status=400)
+    except Exception as e:
+        logger.error(f"API analytics error: {e}")
+        return json_response({"error": str(e)}, status=500)
+
+
+@require_auth
+async def api_chat_strategy(request: web.Request) -> web.Response:
+    """API: генерация контент-стратегии для чата."""
+    try:
+        chat_id = int(request.match_info["chat_id"])
+
+        config = get_config()
+        if not config.has_openrouter:
+            return json_response({
+                "success": False,
+                "error": "OpenRouter API не настроен",
+            }, status=503)
+
+        # Получаем период из тела запроса
+        try:
+            body = await request.json()
+            period = body.get("period", "week")
+        except Exception:
+            period = "week"
+
+        result = await generate_content_strategy(chat_id, period=period)
+
+        status = 200 if result["success"] else 400
+        return json_response(result, status=status)
+
+    except ValueError:
+        return json_response({"error": "invalid chat_id"}, status=400)
+    except Exception as e:
+        logger.error(f"API strategy error: {e}")
+        return json_response({"error": str(e)}, status=500)
+
+
 # ========== HTML Pages ==========
 
 @require_auth
@@ -365,6 +424,8 @@ def create_web_app() -> web.Application:
     app.router.add_get("/api/chats/{chat_id}/messages/daily", api_chat_messages_daily)
     app.router.add_get("/api/dashboard", api_dashboard)
     app.router.add_post("/api/chats/{chat_id}/summary", api_chat_summary)
+    app.router.add_get("/api/chats/{chat_id}/analytics", api_chat_analytics)
+    app.router.add_post("/api/chats/{chat_id}/strategy", api_chat_strategy)
 
     # CORS preflight handlers
     app.router.add_route("OPTIONS", "/api/{path:.*}", lambda r: web.Response())

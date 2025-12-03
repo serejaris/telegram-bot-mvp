@@ -2,6 +2,412 @@
 
 {% block title %}{{ chat.title or chat.id }} - messages{% endblock %}
 
+{% block head %}
+<style>
+    /* ─── Tabs ─── */
+    .tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 12px;
+    }
+
+    .tab {
+        padding: 8px 16px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--dim);
+        font-family: var(--font);
+        font-size: 0.9em;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        position: relative;
+    }
+
+    .tab:hover {
+        color: var(--fg);
+        border-color: var(--fg);
+    }
+
+    .tab.active {
+        color: var(--fg);
+        border-color: var(--fg);
+        background: var(--hover);
+    }
+
+    .tab.active::after {
+        content: "";
+        position: absolute;
+        bottom: -13px;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: var(--bg);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+        animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Analytics Chart ─── */
+    .analytics-container {
+        display: grid;
+        gap: 24px;
+    }
+
+    .chart-section {
+        border: 1px solid var(--border);
+        padding: 20px;
+        background: var(--hover);
+    }
+
+    .chart-title {
+        color: var(--dim);
+        font-size: 0.8em;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 16px;
+    }
+
+    .bar-chart {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        height: 120px;
+        gap: 8px;
+        padding: 0 4px;
+    }
+
+    .bar-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .bar {
+        width: 100%;
+        max-width: 40px;
+        background: linear-gradient(to top, var(--border) 0%, var(--fg) 100%);
+        border: 1px solid var(--border);
+        transition: all 0.3s ease;
+        position: relative;
+        min-height: 2px;
+    }
+
+    .bar:hover {
+        background: linear-gradient(to top, var(--dim) 0%, #fff 100%);
+        transform: scaleX(1.1);
+    }
+
+    .bar-count {
+        position: absolute;
+        top: -20px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.75em;
+        color: var(--fg);
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .bar:hover .bar-count {
+        opacity: 1;
+    }
+
+    .bar-label {
+        font-size: 0.7em;
+        color: var(--muted);
+        text-transform: uppercase;
+    }
+
+    .chart-stats {
+        display: flex;
+        gap: 32px;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px dashed var(--border);
+    }
+
+    .chart-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .chart-stat-value {
+        font-size: 1.5em;
+        color: var(--fg);
+        font-weight: 500;
+    }
+
+    .chart-stat-label {
+        font-size: 0.75em;
+        color: var(--dim);
+        text-transform: uppercase;
+    }
+
+    /* ─── AI Comment ─── */
+    .ai-section {
+        border: 1px solid var(--border);
+        padding: 20px;
+        position: relative;
+    }
+
+    .ai-section::before {
+        content: "AI";
+        position: absolute;
+        top: -8px;
+        left: 12px;
+        background: var(--bg);
+        padding: 0 8px;
+        font-size: 0.7em;
+        color: var(--dim);
+        letter-spacing: 0.15em;
+    }
+
+    .ai-comment {
+        color: var(--fg);
+        line-height: 1.7;
+        font-size: 0.95em;
+    }
+
+    .ai-comment.empty {
+        color: var(--muted);
+        font-style: italic;
+    }
+
+    /* ─── Strategy Section ─── */
+    .strategy-container {
+        display: grid;
+        gap: 20px;
+    }
+
+    .period-selector {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .period-selector label {
+        color: var(--dim);
+        font-size: 0.85em;
+        margin-right: 8px;
+    }
+
+    .period-btn {
+        padding: 8px 16px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--dim);
+        font-family: var(--font);
+        font-size: 0.85em;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .period-btn:hover {
+        border-color: var(--fg);
+        color: var(--fg);
+    }
+
+    .period-btn.selected {
+        border-color: var(--fg);
+        color: var(--fg);
+        background: var(--hover);
+    }
+
+    .generate-btn {
+        padding: 10px 20px;
+        border: 1px solid var(--fg);
+        background: transparent;
+        color: var(--fg);
+        font-family: var(--font);
+        font-size: 0.9em;
+        cursor: pointer;
+        transition: all 0.15s;
+        margin-left: auto;
+    }
+
+    .generate-btn:hover {
+        background: var(--fg);
+        color: var(--bg);
+    }
+
+    .generate-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .generate-btn:disabled:hover {
+        background: transparent;
+        color: var(--fg);
+    }
+
+    .strategy-report {
+        border: 1px solid var(--border);
+        padding: 24px;
+        background: var(--hover);
+        min-height: 200px;
+    }
+
+    .strategy-report h2 {
+        font-size: 1em;
+        margin-top: 20px;
+        margin-bottom: 12px;
+        color: var(--fg);
+    }
+
+    .strategy-report h2:first-child {
+        margin-top: 0;
+    }
+
+    .strategy-report h2::before {
+        content: "## ";
+        color: var(--dim);
+    }
+
+    .strategy-report ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .strategy-report li {
+        padding: 6px 0;
+        padding-left: 16px;
+        position: relative;
+        color: var(--fg);
+        line-height: 1.6;
+    }
+
+    .strategy-report li::before {
+        content: ">";
+        position: absolute;
+        left: 0;
+        color: var(--dim);
+    }
+
+    .strategy-report p {
+        color: var(--fg);
+        line-height: 1.6;
+        margin: 8px 0;
+    }
+
+    .strategy-meta {
+        display: flex;
+        gap: 24px;
+        padding: 12px 0;
+        margin-bottom: 16px;
+        border-bottom: 1px dashed var(--border);
+        font-size: 0.85em;
+        color: var(--dim);
+    }
+
+    /* ─── Loading States ─── */
+    .loading {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--dim);
+        padding: 20px;
+    }
+
+    .loading-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        position: relative;
+    }
+
+    .loading-spinner::before {
+        content: ">";
+        position: absolute;
+        animation: blink 0.5s infinite;
+    }
+
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+    }
+
+    .loading-text {
+        font-size: 0.9em;
+    }
+
+    .loading-text::after {
+        content: "";
+        animation: dots 1.5s infinite;
+    }
+
+    @keyframes dots {
+        0% { content: ""; }
+        25% { content: "."; }
+        50% { content: ".."; }
+        75% { content: "..."; }
+    }
+
+    /* ─── Error State ─── */
+    .error-message {
+        border: 1px solid var(--border);
+        padding: 16px;
+        color: var(--dim);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .error-message::before {
+        content: "[!]";
+        color: var(--muted);
+    }
+
+    .retry-btn {
+        margin-left: auto;
+        padding: 6px 12px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--dim);
+        font-family: var(--font);
+        font-size: 0.85em;
+        cursor: pointer;
+    }
+
+    .retry-btn:hover {
+        border-color: var(--fg);
+        color: var(--fg);
+    }
+
+    /* ─── Empty State ─── */
+    .placeholder {
+        color: var(--muted);
+        text-align: center;
+        padding: 40px 20px;
+        border: 1px dashed var(--border);
+    }
+
+    .placeholder::before {
+        content: "-- ";
+    }
+
+    .placeholder::after {
+        content: " --";
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <h1>{{ chat.title or 'chat_' ~ chat.id }}</h1>
 <p style="color: var(--dim); margin-bottom: 20px;">
@@ -9,83 +415,334 @@
     {{ chat.type }} | id: <code>{{ chat.id }}</code>
 </p>
 
-<div class="filter-bar">
-    <a href="/chats/{{ chat.id }}" {% if not message_type %}class="active"{% endif %}>[ all ]</a>
-    <a href="/chats/{{ chat.id }}?type=text" {% if message_type == 'text' %}class="active"{% endif %}>[ text ]</a>
-    <a href="/chats/{{ chat.id }}?type=photo" {% if message_type == 'photo' %}class="active"{% endif %}>[ photo ]</a>
-    <a href="/chats/{{ chat.id }}?type=video" {% if message_type == 'video' %}class="active"{% endif %}>[ video ]</a>
-    <a href="/chats/{{ chat.id }}?type=sticker" {% if message_type == 'sticker' %}class="active"{% endif %}>[ sticker ]</a>
-    <a href="/chats/{{ chat.id }}?type=document" {% if message_type == 'document' %}class="active"{% endif %}>[ doc ]</a>
+<!-- Tabs -->
+<div class="tabs">
+    <button class="tab active" data-tab="messages">[ сообщения ]</button>
+    <button class="tab" data-tab="analytics">[ аналитика ]</button>
+    <button class="tab" data-tab="strategy">[ стратегия ]</button>
 </div>
 
-{% if messages %}
-<table>
-    <thead>
-        <tr>
-            <th>time</th>
-            <th>user</th>
-            <th>type</th>
-            <th>content</th>
-            <th>reply</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for msg in messages %}
-        <tr>
-            <td>
-                {{ msg.sent_at.strftime('%Y-%m-%d %H:%M') }}
-                {% if msg.edited_at %}
-                <br><small style="color: var(--muted);">*{{ msg.edited_at.strftime('%H:%M') }}</small>
-                {% endif %}
-            </td>
-            <td>
-                {% if msg.user %}
-                <div class="user-info">
-                    <span class="name">{{ msg.user.first_name or '' }} {{ msg.user.last_name or '' }}</span>
-                    {% if msg.user.username %}
-                    <span class="username">{{ msg.user.username }}</span>
+<!-- Messages Tab -->
+<div id="tab-messages" class="tab-content active">
+    <div class="filter-bar">
+        <a href="/chats/{{ chat.id }}" {% if not message_type %}class="active"{% endif %}>[ all ]</a>
+        <a href="/chats/{{ chat.id }}?type=text" {% if message_type == 'text' %}class="active"{% endif %}>[ text ]</a>
+        <a href="/chats/{{ chat.id }}?type=photo" {% if message_type == 'photo' %}class="active"{% endif %}>[ photo ]</a>
+        <a href="/chats/{{ chat.id }}?type=video" {% if message_type == 'video' %}class="active"{% endif %}>[ video ]</a>
+        <a href="/chats/{{ chat.id }}?type=sticker" {% if message_type == 'sticker' %}class="active"{% endif %}>[ sticker ]</a>
+        <a href="/chats/{{ chat.id }}?type=document" {% if message_type == 'document' %}class="active"{% endif %}>[ doc ]</a>
+    </div>
+
+    {% if messages %}
+    <table>
+        <thead>
+            <tr>
+                <th>time</th>
+                <th>user</th>
+                <th>type</th>
+                <th>content</th>
+                <th>reply</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for msg in messages %}
+            <tr>
+                <td>
+                    {{ msg.sent_at.strftime('%Y-%m-%d %H:%M') }}
+                    {% if msg.edited_at %}
+                    <br><small style="color: var(--muted);">*{{ msg.edited_at.strftime('%H:%M') }}</small>
                     {% endif %}
+                </td>
+                <td>
+                    {% if msg.user %}
+                    <div class="user-info">
+                        <span class="name">{{ msg.user.first_name or '' }} {{ msg.user.last_name or '' }}</span>
+                        {% if msg.user.username %}
+                        <span class="username">{{ msg.user.username }}</span>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span style="color: var(--muted);">--</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge badge-{{ msg.message_type }}">{{ msg.message_type }}</span>
+                </td>
+                <td class="message-text">
+                    {{ msg.text or msg.caption or '--' }}
+                </td>
+                <td>
+                    {% if msg.reply_to_message_id %}
+                    #{{ msg.reply_to_message_id }}
+                    {% else %}
+                    --
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="pagination">
+        {% if has_prev %}
+        <a href="/chats/{{ chat.id }}?page={{ page - 1 }}{% if message_type %}&type={{ message_type }}{% endif %}">[ < prev ]</a>
+        {% else %}
+        <span class="disabled">[ < prev ]</span>
+        {% endif %}
+
+        <span style="color: var(--fg);">page {{ page }}</span>
+
+        {% if has_next %}
+        <a href="/chats/{{ chat.id }}?page={{ page + 1 }}{% if message_type %}&type={{ message_type }}{% endif %}">[ next > ]</a>
+        {% else %}
+        <span class="disabled">[ next > ]</span>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        -- no messages {% if message_type %}of type "{{ message_type }}"{% endif %} --
+    </div>
+    {% endif %}
+</div>
+
+<!-- Analytics Tab -->
+<div id="tab-analytics" class="tab-content">
+    <div class="analytics-container">
+        <div id="analytics-loading" class="loading">
+            <span class="loading-spinner"></span>
+            <span class="loading-text">загрузка аналитики</span>
+        </div>
+        <div id="analytics-content" style="display: none;">
+            <div class="chart-section">
+                <div class="chart-title">сообщения за неделю</div>
+                <div id="bar-chart" class="bar-chart"></div>
+                <div class="chart-stats">
+                    <div class="chart-stat">
+                        <span id="stat-total" class="chart-stat-value">0</span>
+                        <span class="chart-stat-label">всего</span>
+                    </div>
+                    <div class="chart-stat">
+                        <span id="stat-average" class="chart-stat-value">0</span>
+                        <span class="chart-stat-label">в среднем/день</span>
+                    </div>
                 </div>
-                {% else %}
-                <span style="color: var(--muted);">--</span>
-                {% endif %}
-            </td>
-            <td>
-                <span class="badge badge-{{ msg.message_type }}">{{ msg.message_type }}</span>
-            </td>
-            <td class="message-text">
-                {{ msg.text or msg.caption or '--' }}
-            </td>
-            <td>
-                {% if msg.reply_to_message_id %}
-                #{{ msg.reply_to_message_id }}
-                {% else %}
-                --
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<div class="pagination">
-    {% if has_prev %}
-    <a href="/chats/{{ chat.id }}?page={{ page - 1 }}{% if message_type %}&type={{ message_type }}{% endif %}">[ < prev ]</a>
-    {% else %}
-    <span class="disabled">[ < prev ]</span>
-    {% endif %}
-
-    <span style="color: var(--fg);">page {{ page }}</span>
-
-    {% if has_next %}
-    <a href="/chats/{{ chat.id }}?page={{ page + 1 }}{% if message_type %}&type={{ message_type }}{% endif %}">[ next > ]</a>
-    {% else %}
-    <span class="disabled">[ next > ]</span>
-    {% endif %}
+            </div>
+            <div class="ai-section">
+                <div id="ai-comment" class="ai-comment"></div>
+            </div>
+        </div>
+        <div id="analytics-error" class="error-message" style="display: none;">
+            <span id="analytics-error-text"></span>
+            <button class="retry-btn" onclick="loadAnalytics()">[ retry ]</button>
+        </div>
+    </div>
 </div>
-{% else %}
-<div class="empty-state">
-    -- no messages {% if message_type %}of type "{{ message_type }}"{% endif %} --
+
+<!-- Strategy Tab -->
+<div id="tab-strategy" class="tab-content">
+    <div class="strategy-container">
+        <div class="period-selector">
+            <label>период:</label>
+            <button class="period-btn selected" data-period="week">[ неделя ]</button>
+            <button class="period-btn" data-period="month">[ месяц ]</button>
+            <button id="generate-strategy-btn" class="generate-btn" onclick="generateStrategy()">
+                сгенерировать отчёт
+            </button>
+        </div>
+
+        <div id="strategy-loading" class="loading" style="display: none;">
+            <span class="loading-spinner"></span>
+            <span class="loading-text">генерирую стратегию</span>
+        </div>
+
+        <div id="strategy-content" style="display: none;">
+            <div class="strategy-report">
+                <div id="strategy-meta" class="strategy-meta"></div>
+                <div id="strategy-report-content"></div>
+            </div>
+        </div>
+
+        <div id="strategy-error" class="error-message" style="display: none;">
+            <span id="strategy-error-text"></span>
+            <button class="retry-btn" onclick="generateStrategy()">[ retry ]</button>
+        </div>
+
+        <div id="strategy-placeholder" class="placeholder">
+            выберите период и нажмите "сгенерировать отчёт"
+        </div>
+    </div>
 </div>
-{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const CHAT_ID = {{ chat.id }};
+    let analyticsLoaded = false;
+    let selectedPeriod = 'week';
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+
+            // Update active tab
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Update active content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            // Lazy load analytics
+            if (tabName === 'analytics' && !analyticsLoaded) {
+                loadAnalytics();
+            }
+        });
+    });
+
+    // Period selection
+    document.querySelectorAll('.period-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedPeriod = btn.dataset.period;
+        });
+    });
+
+    // Load analytics
+    async function loadAnalytics() {
+        const loading = document.getElementById('analytics-loading');
+        const content = document.getElementById('analytics-content');
+        const error = document.getElementById('analytics-error');
+
+        loading.style.display = 'flex';
+        content.style.display = 'none';
+        error.style.display = 'none';
+
+        try {
+            const response = await fetch(`/api/chats/${CHAT_ID}/analytics`);
+            const data = await response.json();
+
+            if (data.success) {
+                renderChart(data.daily_messages);
+                document.getElementById('stat-total').textContent = data.total;
+                document.getElementById('stat-average').textContent = data.average.toFixed(1);
+
+                const aiComment = document.getElementById('ai-comment');
+                if (data.ai_comment) {
+                    aiComment.textContent = data.ai_comment;
+                    aiComment.classList.remove('empty');
+                } else {
+                    aiComment.textContent = 'нет комментария';
+                    aiComment.classList.add('empty');
+                }
+
+                loading.style.display = 'none';
+                content.style.display = 'grid';
+                analyticsLoaded = true;
+            } else {
+                throw new Error(data.error || 'Ошибка загрузки');
+            }
+        } catch (e) {
+            loading.style.display = 'none';
+            error.style.display = 'flex';
+            document.getElementById('analytics-error-text').textContent = e.message;
+        }
+    }
+
+    // Render bar chart
+    function renderChart(dailyMessages) {
+        const chart = document.getElementById('bar-chart');
+        chart.innerHTML = '';
+
+        const maxCount = Math.max(...dailyMessages.map(d => d.count), 1);
+        const dayNames = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+
+        dailyMessages.forEach(item => {
+            const date = new Date(item.date);
+            const dayName = dayNames[date.getDay()];
+            const height = Math.max((item.count / maxCount) * 100, 2);
+
+            const barItem = document.createElement('div');
+            barItem.className = 'bar-item';
+            barItem.innerHTML = `
+                <div class="bar" style="height: ${height}px;">
+                    <span class="bar-count">${item.count}</span>
+                </div>
+                <span class="bar-label">${dayName}</span>
+            `;
+            chart.appendChild(barItem);
+        });
+    }
+
+    // Generate strategy
+    async function generateStrategy() {
+        const loading = document.getElementById('strategy-loading');
+        const content = document.getElementById('strategy-content');
+        const error = document.getElementById('strategy-error');
+        const placeholder = document.getElementById('strategy-placeholder');
+        const btn = document.getElementById('generate-strategy-btn');
+
+        loading.style.display = 'flex';
+        content.style.display = 'none';
+        error.style.display = 'none';
+        placeholder.style.display = 'none';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(`/api/chats/${CHAT_ID}/strategy`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ period: selectedPeriod })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                const periodText = selectedPeriod === 'week' ? 'неделя' : 'месяц';
+                document.getElementById('strategy-meta').innerHTML = `
+                    <span>период: ${periodText}</span>
+                    <span>даты: ${data.date_range}</span>
+                    <span>сообщений: ${data.messages_analyzed}</span>
+                `;
+
+                // Simple markdown rendering
+                const reportHtml = renderMarkdown(data.report);
+                document.getElementById('strategy-report-content').innerHTML = reportHtml;
+
+                loading.style.display = 'none';
+                content.style.display = 'block';
+            } else {
+                throw new Error(data.error || 'Ошибка генерации');
+            }
+        } catch (e) {
+            loading.style.display = 'none';
+            error.style.display = 'flex';
+            document.getElementById('strategy-error-text').textContent = e.message;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // Simple markdown to HTML
+    function renderMarkdown(text) {
+        return text
+            // Headers
+            .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+            .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+            // Bold
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            // Lists
+            .replace(/^- (.+)$/gm, '<li>$1</li>')
+            .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+            // Wrap consecutive li in ul
+            .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+            // Paragraphs
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/^(?!<[uh])(.+)$/gm, '<p>$1</p>')
+            // Clean up
+            .replace(/<p><\/p>/g, '')
+            .replace(/<p>(<[uh])/g, '$1')
+            .replace(/(<\/[uh][l2]>)<\/p>/g, '$1');
+    }
+</script>
 {% endblock %}
