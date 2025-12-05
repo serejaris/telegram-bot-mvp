@@ -345,7 +345,7 @@
 {% if chats %}
 <div class="chats-grid">
     {% for chat in chats %}
-    <div class="chat-card" data-chat-id="{{ chat.id }}">
+    <div class="chat-card" data-chat-id="{{ chat.id }}" data-last-message-at="{{ chat.last_message_at.isoformat() if chat.last_message_at else '' }}">
         <div class="chat-header">
             <h2 class="chat-title">
                 <a href="/chats/{{ chat.id }}">{{ chat.title or 'chat_' ~ chat.id }}</a>
@@ -444,6 +444,22 @@
 
 {% block scripts %}
 <script>
+// Sort chat cards by last_message_at (desc). Cards without date stay at the end.
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.querySelector('.chats-grid');
+    if (!container) return;
+
+    const cards = Array.from(container.querySelectorAll('.chat-card'));
+
+    cards
+        .sort((a, b) => {
+            const aDate = a.dataset.lastMessageAt ? new Date(a.dataset.lastMessageAt).getTime() : 0;
+            const bDate = b.dataset.lastMessageAt ? new Date(b.dataset.lastMessageAt).getTime() : 0;
+            return bDate - aDate;
+        })
+        .forEach(card => container.appendChild(card));
+});
+
 async function downloadYesterdayJson(chatId, button) {
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
     const url = `/api/chats/${chatId}/messages/daily?date=${yesterday}`;
