@@ -22,6 +22,9 @@ class Config:
     openrouter_api_key: Optional[str] = None
     openrouter_model: str = "openai/gpt-4o-mini"
     
+    # Спец-функции под конкретные чаты
+    vibecoder_chat_id: Optional[int] = None
+    
     @classmethod
     def from_env(cls) -> "Config":
         """Загружает конфигурацию из переменных окружения."""
@@ -43,6 +46,9 @@ class Config:
             admin_password=os.getenv("ADMIN_PASSWORD"),
             openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
             openrouter_model=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+            vibecoder_chat_id=int(os.getenv("VIBECODER_CHAT_ID"))
+            if os.getenv("VIBECODER_CHAT_ID")
+            else None,
         )
     
     @property

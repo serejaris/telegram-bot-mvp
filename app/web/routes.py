@@ -369,6 +369,15 @@ async def chat_messages_page(request: web.Request):
     
     messages = await get_chat_messages(chat_id, limit, offset, message_type)
     
+    config = get_config()
+    is_vibecoder = False
+    if chat:
+        title = (chat.get("title") or "").lower()
+        is_vibecoder = (
+            (config.vibecoder_chat_id == chat_id)
+            or ("вайбкод" in title)
+        )
+    
     return {
         "request": request,
         "chat": chat,
@@ -377,6 +386,7 @@ async def chat_messages_page(request: web.Request):
         "message_type": message_type,
         "has_next": len(messages) == limit,
         "has_prev": page > 1,
+        "is_vibecoder": is_vibecoder,
     }
 
 

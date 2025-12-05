@@ -442,6 +442,55 @@
         color: var(--muted);
         font-size: 0.8em;
     }
+
+    /* ─── VibeCoder AI Tab ─── */
+    .prompt-grid {
+        display: grid;
+        gap: 16px;
+    }
+
+    .prompt-card {
+        border: 1px solid var(--border);
+        padding: 16px;
+        background: var(--hover);
+        display: grid;
+        gap: 12px;
+    }
+
+    .prompt-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .prompt-title {
+        font-size: 1em;
+        color: var(--fg);
+        margin: 0;
+    }
+
+    .prompt-meta {
+        color: var(--muted);
+        font-size: 0.85em;
+    }
+
+    .prompt-body pre {
+        margin: 0;
+        white-space: pre-wrap;
+        background: var(--bg);
+        border: 1px dashed var(--border);
+        padding: 12px;
+        color: var(--fg);
+        line-height: 1.5;
+        font-family: var(--font);
+    }
+
+    .prompt-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
 </style>
 {% endblock %}
 
@@ -457,6 +506,9 @@
     <button class="tab active" data-tab="messages">[ сообщения ]</button>
     <button class="tab" data-tab="analytics">[ аналитика ]</button>
     <button class="tab" data-tab="strategy">[ стратегия ]</button>
+    {% if is_vibecoder %}
+    <button class="tab" data-tab="vibecoder-ai">[ ai анализ ]</button>
+    {% endif %}
     <button class="tab" data-tab="export">[ экспорт ]</button>
 </div>
 
@@ -610,6 +662,67 @@
         </div>
     </div>
 </div>
+
+{% if is_vibecoder %}
+<!-- VibeCoder AI Tab -->
+<div id="tab-vibecoder-ai" class="tab-content">
+    <div class="prompt-grid">
+        <div class="prompt-card">
+            <div class="prompt-header">
+                <h2 class="prompt-title">Дайджест за сутки (2 декабря)</h2>
+                <span class="prompt-meta">format: markdown</span>
+            </div>
+            <div class="prompt-body">
+                <pre id="prompt-digest">Ты — редактор сообщества. У тебя есть файл result.json с историей чата за 2 декабря (последние 24 часа).
+
+Сделай интересный и вовлекающий дайджест:
+- выделяй только темы, которые обсуждали сегодня;
+- темы, обсуждавшиеся вчера, не повторяй, если не было продолжения;
+- добавляй короткие, цепляющие названия и смысл каждого пункта.
+
+Структура вывода в Markdown:
+- заголовок дня;
+- 3–7 пунктов в формате буллетов (что обсуждали, чем это интересно, если есть — короткая цитата в кавычках);
+- финальный вывод/что дальше, если уместно.
+
+Не придумывай факты — опирайся только на содержимое result.json. Дай ответ в чистой Markdown-разметке без префиксов и лишних комментариев, чтобы можно было сразу копировать.</pre>
+            </div>
+            <div class="prompt-actions">
+                <button class="copy-btn" onclick="copyPrompt('prompt-digest', this)">[ copy ]</button>
+            </div>
+        </div>
+
+        <div class="prompt-card">
+            <div class="prompt-header">
+                <h2 class="prompt-title">Комиксы по темам (22–23 ноября)</h2>
+                <span class="prompt-meta">role: сценарист</span>
+            </div>
+            <div class="prompt-body">
+                <pre id="prompt-comics">Роль: Ты — креативный сценарист и эксперт по созданию вирального контента.
+
+Задача:
+1) Анализ: внимательно проанализируй историю чата (файл result.json) и выдели самые яркие, смешные и обсуждаемые темы/инсайты за последние сутки (22–23 ноября).
+2) Генерация: на основе этих тем создай промпты для генерации комикс-стрипов.
+
+Требования к комиксам:
+- Вселенные: используй стилистику популярных мультсериалов, сериалов или игр (выбирай новые, не повторяй предыдущие).
+- Сюжет: сценарии должны быть насыщенными, с завязкой, кульминацией и развязкой. Избегай простых и плоских сюжетов. Сделай их смешными и жизненными для участников чата.
+- Длина: делай 5–6 кадров, чтобы история успела раскрыться.
+- Язык: сам промпт должен быть на русском; текст в облачках/диалогах строго на русском; не используй слово "вайб" в текстах.
+
+Формат вывода для каждой темы:
+Тема: [Название темы из чата]
+Контекст: [Краткое описание ситуации]
+Вселенная: [Название мультфильма/сериала/игры]
+Промпт: [Детальный сценарий по кадрам для генерации]</pre>
+            </div>
+            <div class="prompt-actions">
+                <button class="copy-btn" onclick="copyPrompt('prompt-comics', this)">[ copy ]</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Export Tab -->
 <div id="tab-export" class="tab-content">
@@ -850,6 +963,13 @@
         } finally {
             btn.disabled = false;
         }
+    }
+
+    function copyPrompt(elementId, btn) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        const text = el.textContent.trim();
+        copyToClipboard(text, btn);
     }
 </script>
 {% endblock %}
