@@ -19,6 +19,7 @@ from ..models import (
     get_chats_with_stats,
     get_chat_messages,
     get_chat_messages_by_date,
+    get_chat_messages_by_date_range,
     get_chat_by_id,
     get_users,
     get_dashboard_data,
@@ -216,6 +217,69 @@ async def api_chat_messages_daily(request: web.Request) -> web.Response:
         return json_response({"error": "invalid chat_id or date format"}, status=400)
     except Exception as e:
         logger.error(f"API daily messages error: {e}")
+        return json_response({"error": str(e)}, status=500)
+
+
+@require_auth
+async def api_chat_messages_export(request: web.Request) -> web.Response:
+    """API: экспорт сообщений чата за диапазон дат (UTC+3)."""
+    try:
+        chat_id = int(request.match_info["chat_id"])
+        date_from = request.query.get("from")
+        date_to = request.query.get("to")
+
+        if not date_from or not date_to:
+            return json_response(
+                {"error": "from and to parameters required (YYYY-MM-DD)"},
+                status=400
+            )
+
+        # Validate date format
+        try:
+            datetime.strptime(date_from, "%Y-%m-%d")
+            datetime.strptime(date_to, "%Y-%m-%d")
+        except ValueError:
+            return json_response(
+                {"error": "invalid date format, use YYYY-MM-DD"},
+                status=400
+            )
+
+        # Validate range
+        if date_from > date_to:
+            return json_response(
+                {"error": "from date must be before or equal to to date"},
+                status=400
+            )
+
+        # Get chat info
+        chat = await get_chat_by_id(chat_id)
+        if not chat:
+            return json_response({"error": "chat not found"}, status=404)
+
+        messages = await get_chat_messages_by_date_range(chat_id, date_from, date_to)
+
+        # Serialize datetime
+        for msg in messages:
+            if msg["sent_at"]:
+                msg["sent_at"] = msg["sent_at"].isoformat()
+            if msg["edited_at"]:
+                msg["edited_at"] = msg["edited_at"].isoformat()
+
+        return json_response({
+            "chat_id": chat_id,
+            "chat_title": chat.get("title"),
+            "period": {
+                "from": date_from,
+                "to": date_to,
+            },
+            "timezone": "UTC+3",
+            "messages_count": len(messages),
+            "messages": messages,
+        })
+    except ValueError:
+        return json_response({"error": "invalid chat_id"}, status=400)
+    except Exception as e:
+        logger.error(f"API export messages error: {e}")
         return json_response({"error": str(e)}, status=500)
 
 
@@ -432,6 +496,7 @@ def create_web_app() -> web.Application:
     app.router.add_get("/api/chats", api_chats)
     app.router.add_get("/api/chats/{chat_id}/messages", api_chat_messages)
     app.router.add_get("/api/chats/{chat_id}/messages/daily", api_chat_messages_daily)
+    app.router.add_get("/api/chats/{chat_id}/messages/export", api_chat_messages_export)
     app.router.add_get("/api/dashboard", api_dashboard)
     app.router.add_post("/api/chats/{chat_id}/summary", api_chat_summary)
     app.router.add_get("/api/chats/{chat_id}/analytics", api_chat_analytics)
