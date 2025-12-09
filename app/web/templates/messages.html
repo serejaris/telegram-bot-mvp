@@ -969,20 +969,79 @@
             .replace(/(<\/[uh][l2]>)<\/p>/g, '$1');
     }
 
-    // Export: set default date to yesterday
-    (function initExportDate() {
-        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-        document.getElementById('export-date').value = yesterday;
+    // Export functionality
+    let selectedExportPeriod = 'week';
+
+    // Period button selection
+    document.querySelectorAll('.export-period-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.export-period-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedExportPeriod = btn.dataset.period;
+
+            const dateRange = document.getElementById('export-date-range');
+            if (selectedExportPeriod === 'custom') {
+                dateRange.classList.add('visible');
+            } else {
+                dateRange.classList.remove('visible');
+            }
+        });
+    });
+
+    // Initialize date inputs with defaults
+    (function initExportDates() {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const weekAgo = new Date(yesterday);
+        weekAgo.setDate(weekAgo.getDate() - 6);
+
+        document.getElementById('export-date-from').value = weekAgo.toISOString().split('T')[0];
+        document.getElementById('export-date-to').value = yesterday.toISOString().split('T')[0];
     })();
 
-    // Export: download JSON by selected date
-    async function downloadByDate() {
-        const dateInput = document.getElementById('export-date');
-        const date = dateInput.value;
-        const btn = document.getElementById('export-btn');
+    // Calculate date range based on selected period
+    function getExportDateRange() {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
 
-        if (!date) {
-            alert('выберите дату');
+        if (selectedExportPeriod === 'week') {
+            const from = new Date(yesterday);
+            from.setDate(from.getDate() - 6);
+            return {
+                from: from.toISOString().split('T')[0],
+                to: yesterday.toISOString().split('T')[0]
+            };
+        } else if (selectedExportPeriod === 'month') {
+            const from = new Date(yesterday);
+            from.setDate(from.getDate() - 29);
+            return {
+                from: from.toISOString().split('T')[0],
+                to: yesterday.toISOString().split('T')[0]
+            };
+        } else {
+            // custom
+            return {
+                from: document.getElementById('export-date-from').value,
+                to: document.getElementById('export-date-to').value
+            };
+        }
+    }
+
+    // Download export
+    async function downloadExport() {
+        const btn = document.getElementById('export-btn');
+        const range = getExportDateRange();
+
+        if (!range.from || !range.to) {
+            alert('выберите даты');
+            return;
+        }
+
+        if (range.from > range.to) {
+            alert('дата "от" должна быть раньше даты "до"');
             return;
         }
 
@@ -991,7 +1050,9 @@
         btn.disabled = true;
 
         try {
-            const response = await fetch(`/api/chats/${CHAT_ID}/messages/daily?date=${date}`);
+            const response = await fetch(
+                `/api/chats/${CHAT_ID}/messages/export?from=${range.from}&to=${range.to}`
+            );
             const data = await response.json();
 
             if (data.error) {
@@ -1003,7 +1064,7 @@
 
             const a = document.createElement('a');
             a.href = url;
-            a.download = `chat_${CHAT_ID}_${date}.json`;
+            a.download = `chat_${CHAT_ID}_${range.from}_${range.to}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
