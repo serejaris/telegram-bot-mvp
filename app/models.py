@@ -515,6 +515,55 @@ async def get_chat_messages_by_date(
         ]
 
 
+async def get_chat_messages_by_date_range(
+    chat_id: int,
+    date_from: str,  # format: YYYY-MM-DD
+    date_to: str,    # format: YYYY-MM-DD
+) -> List[Dict[str, Any]]:
+    """Получает все сообщения чата за диапазон дат (включительно, UTC+3)."""
+    async with get_cursor() as cur:
+        await cur.execute("""
+            SELECT
+                m.message_id,
+                m.message_type,
+                m.text,
+                m.caption,
+                m.sent_at,
+                m.edited_at,
+                m.reply_to_message_id,
+                u.id as user_id,
+                u.first_name,
+                u.last_name,
+                u.username
+            FROM messages m
+            LEFT JOIN users u ON m.user_id = u.id
+            WHERE m.chat_id = %s
+              AND (m.sent_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow')::date >= %s::date
+              AND (m.sent_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow')::date <= %s::date
+            ORDER BY m.sent_at ASC
+        """, (chat_id, date_from, date_to))
+
+        rows = await cur.fetchall()
+        return [
+            {
+                "message_id": row[0],
+                "message_type": row[1],
+                "text": row[2],
+                "caption": row[3],
+                "sent_at": row[4],
+                "edited_at": row[5],
+                "reply_to_message_id": row[6],
+                "user": {
+                    "id": row[7],
+                    "first_name": row[8],
+                    "last_name": row[9],
+                    "username": row[10],
+                } if row[7] else None
+            }
+            for row in rows
+        ]
+
+
 async def get_users(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
     """Получает список пользователей."""
     async with get_cursor() as cur:
