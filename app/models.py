@@ -68,46 +68,46 @@ CREATE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username 
 # SQL для миграции существующих таблиц
 MIGRATION_SQL = """
 -- Добавляем новые колонки, если их нет
-DO $$ 
+DO $$
 BEGIN
     -- messages: message_type
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                    WHERE table_name='messages' AND column_name='message_type') THEN
         ALTER TABLE messages ADD COLUMN message_type VARCHAR(50) NOT NULL DEFAULT 'text';
     END IF;
-    
+
     -- messages: caption
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                    WHERE table_name='messages' AND column_name='caption') THEN
         ALTER TABLE messages ADD COLUMN caption TEXT;
     END IF;
-    
+
     -- messages: reply_to_message_id
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                    WHERE table_name='messages' AND column_name='reply_to_message_id') THEN
         ALTER TABLE messages ADD COLUMN reply_to_message_id BIGINT;
     END IF;
-    
+
     -- messages: forward_from_chat_id
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                    WHERE table_name='messages' AND column_name='forward_from_chat_id') THEN
         ALTER TABLE messages ADD COLUMN forward_from_chat_id BIGINT;
     END IF;
-    
+
     -- messages: edited_at
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                    WHERE table_name='messages' AND column_name='edited_at') THEN
         ALTER TABLE messages ADD COLUMN edited_at TIMESTAMPTZ;
     END IF;
-    
+
     -- users: is_premium
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                    WHERE table_name='users' AND column_name='is_premium') THEN
         ALTER TABLE users ADD COLUMN is_premium BOOLEAN DEFAULT FALSE;
     END IF;
-    
+
     -- users: last_updated_at
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                    WHERE table_name='users' AND column_name='last_updated_at') THEN
         ALTER TABLE users ADD COLUMN last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
     END IF;
@@ -178,20 +178,20 @@ def detect_message_type(msg: Message) -> str:
 
 def get_forward_chat_id(msg: Message) -> Optional[int]:
     """Извлекает ID чата-источника для пересланных сообщений.
-    
+
     В python-telegram-bot v21+ forward_from_chat заменён на forward_origin.
     """
     if not msg.forward_origin:
         return None
-    
+
     # MessageOriginChat - сообщение переслано от имени чата
     if isinstance(msg.forward_origin, MessageOriginChat):
         return msg.forward_origin.sender_chat.id
-    
+
     # MessageOriginChannel - сообщение переслано из канала
     if isinstance(msg.forward_origin, MessageOriginChannel):
         return msg.forward_origin.chat.id
-    
+
     # MessageOriginUser, MessageOriginHiddenUser - нет chat ID
     return None
 
@@ -242,22 +242,22 @@ async def save_message(msg: Message, is_edit: bool = False):
     """Сохраняет сообщение в базу данных."""
     if not msg.from_user:
         return
-    
+
     # Сохраняем пользователя и чат
     await save_user(msg.from_user)
     await save_chat(msg.chat)
-    
+
     message_type = detect_message_type(msg)
     text_content = msg.text or None
     caption = msg.caption or None
     reply_to_id = msg.reply_to_message.message_id if msg.reply_to_message else None
     forward_chat_id = get_forward_chat_id(msg)
-    
+
     async with get_cursor() as cur:
         if is_edit:
             # Обновляем существующее сообщение
             await cur.execute("""
-                UPDATE messages 
+                UPDATE messages
                 SET text = %s, caption = %s, edited_at = %s, raw_message = %s
                 WHERE chat_id = %s AND message_id = %s;
             """, (
@@ -322,28 +322,28 @@ async def get_stats() -> Stats:
         # Общие счётчики
         await cur.execute("SELECT COUNT(*) FROM chats")
         total_chats = (await cur.fetchone())[0]
-        
+
         await cur.execute("SELECT COUNT(*) FROM users")
         total_users = (await cur.fetchone())[0]
-        
+
         await cur.execute("SELECT COUNT(*) FROM messages")
         total_messages = (await cur.fetchone())[0]
-        
+
         await cur.execute("""
-            SELECT COUNT(*) FROM messages 
+            SELECT COUNT(*) FROM messages
             WHERE sent_at >= CURRENT_DATE
         """)
         messages_today = (await cur.fetchone())[0]
-        
+
         # Сообщения по типам
         await cur.execute("""
-            SELECT message_type, COUNT(*) as cnt 
-            FROM messages 
-            GROUP BY message_type 
+            SELECT message_type, COUNT(*) as cnt
+            FROM messages
+            GROUP BY message_type
             ORDER BY cnt DESC
         """)
         messages_by_type = {row[0]: row[1] for row in await cur.fetchall()}
-        
+
         return Stats(
             total_chats=total_chats,
             total_users=total_users,
@@ -357,7 +357,7 @@ async def get_chats_with_stats() -> List[ChatStats]:
     """Получает список чатов со статистикой."""
     async with get_cursor() as cur:
         await cur.execute("""
-            SELECT 
+            SELECT
                 c.id,
                 c.type,
                 c.title,
@@ -371,7 +371,7 @@ async def get_chats_with_stats() -> List[ChatStats]:
             GROUP BY c.id, c.type, c.title, c.username, c.first_seen_at
             ORDER BY message_count DESC
         """)
-        
+
         rows = await cur.fetchall()
         return [
             ChatStats(
@@ -389,15 +389,15 @@ async def get_chats_with_stats() -> List[ChatStats]:
 
 
 async def get_chat_messages(
-    chat_id: int, 
-    limit: int = 100, 
+    chat_id: int,
+    limit: int = 100,
     offset: int = 0,
     message_type: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """Получает сообщения чата."""
     async with get_cursor() as cur:
         query = """
-            SELECT 
+            SELECT
                 m.message_id,
                 m.message_type,
                 m.text,
@@ -414,17 +414,17 @@ async def get_chat_messages(
             WHERE m.chat_id = %s
         """
         params = [chat_id]
-        
+
         if message_type:
             query += " AND m.message_type = %s"
             params.append(message_type)
-        
+
         query += " ORDER BY m.sent_at DESC LIMIT %s OFFSET %s"
         params.extend([limit, offset])
-        
+
         await cur.execute(query, params)
         rows = await cur.fetchall()
-        
+
         return [
             {
                 "message_id": row[0],
@@ -453,10 +453,10 @@ async def get_chat_by_id(chat_id: int) -> Optional[Dict[str, Any]]:
             FROM chats WHERE id = %s
         """, (chat_id,))
         row = await cur.fetchone()
-        
+
         if not row:
             return None
-        
+
         return {
             "id": row[0],
             "type": row[1],
@@ -475,7 +475,7 @@ async def get_chat_messages_by_date(
     async with get_cursor() as cur:
         # UTC+3: день начинается в 00:00 UTC+3 = 21:00 UTC предыдущего дня
         await cur.execute("""
-            SELECT 
+            SELECT
                 m.message_id,
                 m.message_type,
                 m.text,
@@ -493,7 +493,7 @@ async def get_chat_messages_by_date(
               AND (m.sent_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow')::date = %s::date
             ORDER BY m.sent_at ASC
         """, (chat_id, date_str))
-        
+
         rows = await cur.fetchall()
         return [
             {
@@ -568,7 +568,7 @@ async def get_users(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
     """Получает список пользователей."""
     async with get_cursor() as cur:
         await cur.execute("""
-            SELECT 
+            SELECT
                 u.id,
                 u.first_name,
                 u.last_name,
@@ -580,12 +580,12 @@ async def get_users(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
                 COUNT(m.message_id) as message_count
             FROM users u
             LEFT JOIN messages m ON u.id = m.user_id
-            GROUP BY u.id, u.first_name, u.last_name, u.username, 
+            GROUP BY u.id, u.first_name, u.last_name, u.username,
                      u.is_bot, u.is_premium, u.language_code, u.first_seen_at
             ORDER BY message_count DESC
             LIMIT %s OFFSET %s
         """, (limit, offset))
-        
+
         rows = await cur.fetchall()
         return [
             {
@@ -619,61 +619,74 @@ class DashboardChat:
 async def get_dashboard_data() -> List[DashboardChat]:
     """Получает данные для дашборда: чаты с полной статистикой."""
     async with get_cursor() as cur:
-        # Получаем чаты с базовой статистикой
+        # Optimized query using CTEs and LATERAL JOINs to avoid N+1 problem
         await cur.execute("""
+            WITH stats AS (
+                SELECT
+                    c.id,
+                    c.title,
+                    COUNT(m.message_id) as total_messages,
+                    COUNT(m.message_id) FILTER (WHERE m.sent_at >= CURRENT_DATE) as today_messages
+                FROM chats c
+                LEFT JOIN messages m ON c.id = m.chat_id
+                GROUP BY c.id, c.title
+            )
             SELECT
-                c.id,
-                c.title,
-                COUNT(m.message_id) as total_messages,
-                COUNT(m.message_id) FILTER (WHERE m.sent_at >= CURRENT_DATE) as today_messages
-            FROM chats c
-            LEFT JOIN messages m ON c.id = m.chat_id
-            GROUP BY c.id, c.title
-            ORDER BY total_messages DESC
-        """)
-        chats_data = await cur.fetchall()
-
-        result = []
-        for chat_row in chats_data:
-            chat_id = chat_row[0]
-
-            # Последнее сообщение
-            await cur.execute("""
+                s.id,
+                s.title,
+                s.total_messages,
+                s.today_messages,
+                lm.text,
+                lm.author,
+                lm.sent_at,
+                COALESCE(tu.top_users, '[]'::json)
+            FROM stats s
+            LEFT JOIN LATERAL (
                 SELECT
                     m.text,
                     COALESCE(u.username, u.first_name, 'Unknown') as author,
                     m.sent_at
                 FROM messages m
                 LEFT JOIN users u ON m.user_id = u.id
-                WHERE m.chat_id = %s AND m.text IS NOT NULL
+                WHERE m.chat_id = s.id AND m.text IS NOT NULL
                 ORDER BY m.sent_at DESC
                 LIMIT 1
-            """, (chat_id,))
-            last_msg = await cur.fetchone()
-
-            # Топ пользователей за неделю
-            await cur.execute("""
+            ) lm ON TRUE
+            LEFT JOIN LATERAL (
                 SELECT
-                    COALESCE(u.username, u.first_name, 'Unknown') as name,
-                    COUNT(*) as count
-                FROM messages m
-                JOIN users u ON m.user_id = u.id
-                WHERE m.chat_id = %s
-                  AND m.sent_at >= NOW() - INTERVAL '7 days'
-                GROUP BY u.id, u.username, u.first_name
-                ORDER BY count DESC
-                LIMIT 3
-            """, (chat_id,))
-            top_users = [{"name": row[0], "count": row[1]} for row in await cur.fetchall()]
+                    json_agg(json_build_object('name', sub.name, 'count', sub.count) ORDER BY sub.count DESC) as top_users
+                FROM (
+                    SELECT
+                        COALESCE(u.username, u.first_name, 'Unknown') as name,
+                        COUNT(*) as count
+                    FROM messages m
+                    JOIN users u ON m.user_id = u.id
+                    WHERE m.chat_id = s.id
+                      AND m.sent_at >= NOW() - INTERVAL '7 days'
+                    GROUP BY u.id, u.username, u.first_name
+                    ORDER BY count DESC
+                    LIMIT 3
+                ) sub
+            ) tu ON TRUE
+            ORDER BY s.total_messages DESC
+        """)
+
+        rows = await cur.fetchall()
+
+        result = []
+        for row in rows:
+            top_users = row[7]
+            if isinstance(top_users, str):
+                top_users = json.loads(top_users)
 
             result.append(DashboardChat(
-                id=chat_row[0],
-                title=chat_row[1],
-                total_messages=chat_row[2],
-                today_messages=chat_row[3],
-                last_message_text=last_msg[0] if last_msg else None,
-                last_message_author=last_msg[1] if last_msg else None,
-                last_message_at=last_msg[2] if last_msg else None,
+                id=row[0],
+                title=row[1],
+                total_messages=row[2],
+                today_messages=row[3],
+                last_message_text=row[4],
+                last_message_author=row[5],
+                last_message_at=row[6],
                 top_users=top_users,
             ))
 
