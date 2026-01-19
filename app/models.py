@@ -617,63 +617,75 @@ class DashboardChat:
 
 
 async def get_dashboard_data() -> List[DashboardChat]:
-    """Получает данные для дашборда: чаты с полной статистикой."""
+    """Получает данные для дашборда: чаты с полной статистикой.
+
+    Optimized to use a single query with LATERAL joins to avoid N+1 problem.
+    """
     async with get_cursor() as cur:
-        # Получаем чаты с базовой статистикой
         await cur.execute("""
             SELECT
                 c.id,
                 c.title,
-                COUNT(m.message_id) as total_messages,
-                COUNT(m.message_id) FILTER (WHERE m.sent_at >= CURRENT_DATE) as today_messages
+                COALESCE(cs.total_messages, 0) as total_messages,
+                COALESCE(cs.today_messages, 0) as today_messages,
+                lm.text,
+                lm.author,
+                lm.sent_at,
+                COALESCE(tu.users, '[]'::json)
             FROM chats c
-            LEFT JOIN messages m ON c.id = m.chat_id
-            GROUP BY c.id, c.title
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(m.message_id) as total_messages,
+                    COUNT(m.message_id) FILTER (WHERE m.sent_at >= CURRENT_DATE) as today_messages
+                FROM messages m
+                WHERE m.chat_id = c.id
+            ) cs ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT
+                    m2.text,
+                    COALESCE(u.username, u.first_name, 'Unknown') as author,
+                    m2.sent_at
+                FROM messages m2
+                LEFT JOIN users u ON m2.user_id = u.id
+                WHERE m2.chat_id = c.id AND m2.text IS NOT NULL
+                ORDER BY m2.sent_at DESC
+                LIMIT 1
+            ) lm ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT
+                    json_agg(json_build_object('name', sub.name, 'count', sub.count) ORDER BY sub.count DESC) as users
+                FROM (
+                    SELECT
+                        COALESCE(u.username, u.first_name, 'Unknown') as name,
+                        COUNT(*) as count
+                    FROM messages m3
+                    JOIN users u ON m3.user_id = u.id
+                    WHERE m3.chat_id = c.id
+                      AND m3.sent_at >= NOW() - INTERVAL '7 days'
+                    GROUP BY u.id, u.username, u.first_name
+                    ORDER BY count DESC
+                    LIMIT 3
+                ) sub
+            ) tu ON TRUE
             ORDER BY total_messages DESC
         """)
         chats_data = await cur.fetchall()
 
         result = []
-        for chat_row in chats_data:
-            chat_id = chat_row[0]
-
-            # Последнее сообщение
-            await cur.execute("""
-                SELECT
-                    m.text,
-                    COALESCE(u.username, u.first_name, 'Unknown') as author,
-                    m.sent_at
-                FROM messages m
-                LEFT JOIN users u ON m.user_id = u.id
-                WHERE m.chat_id = %s AND m.text IS NOT NULL
-                ORDER BY m.sent_at DESC
-                LIMIT 1
-            """, (chat_id,))
-            last_msg = await cur.fetchone()
-
-            # Топ пользователей за неделю
-            await cur.execute("""
-                SELECT
-                    COALESCE(u.username, u.first_name, 'Unknown') as name,
-                    COUNT(*) as count
-                FROM messages m
-                JOIN users u ON m.user_id = u.id
-                WHERE m.chat_id = %s
-                  AND m.sent_at >= NOW() - INTERVAL '7 days'
-                GROUP BY u.id, u.username, u.first_name
-                ORDER BY count DESC
-                LIMIT 3
-            """, (chat_id,))
-            top_users = [{"name": row[0], "count": row[1]} for row in await cur.fetchall()]
+        for row in chats_data:
+            # Handle potential string JSON (if driver returns string) or list/dict
+            top_users = row[7]
+            if isinstance(top_users, str):
+                top_users = json.loads(top_users)
 
             result.append(DashboardChat(
-                id=chat_row[0],
-                title=chat_row[1],
-                total_messages=chat_row[2],
-                today_messages=chat_row[3],
-                last_message_text=last_msg[0] if last_msg else None,
-                last_message_author=last_msg[1] if last_msg else None,
-                last_message_at=last_msg[2] if last_msg else None,
+                id=row[0],
+                title=row[1],
+                total_messages=row[2],
+                today_messages=row[3],
+                last_message_text=row[4],
+                last_message_author=row[5],
+                last_message_at=row[6],
                 top_users=top_users,
             ))
 
