@@ -1,0 +1,3 @@
+## 2024-05-23 - PostgreSQL N+1 Optimization with LATERAL Joins
+**Learning:** When fetching nested data (e.g., chats -> last message, chats -> top users), standard N+1 loops in Python are disastrous for performance. PostgreSQL's `LATERAL` joins combined with `json_agg` allow fetching complex hierarchical data in a single query while preserving independent LIMIT/ORDER BY logic for sub-items.
+**Action:** Always prefer `LATERAL` joins with `json_agg` over making secondary queries in a loop. Ensure `json_agg` includes `ORDER BY` if the list order matters. Also, `psycopg` v3 handles JSON deserialization automatically, but adding a defensive `isinstance(x, str)` check ensures compatibility with mocks or other drivers.
