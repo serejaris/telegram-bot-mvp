@@ -23,6 +23,7 @@ from ..models import (
     get_chat_by_id,
     get_users,
     get_dashboard_data,
+    get_join_requests,
 )
 from ..services.summary import generate_chat_summary
 from ..services.analytics import generate_chat_analytics
@@ -395,6 +396,38 @@ async def api_chat_strategy(request: web.Request) -> web.Response:
         return json_response({"error": str(e)}, status=500)
 
 
+@require_auth
+async def api_chat_join_requests(request: web.Request) -> web.Response:
+    """API: join requests for a chat (pending/declined/expired)."""
+    try:
+        chat_id = int(request.match_info["chat_id"])
+        limit = int(request.query.get("limit", 100))
+        offset = int(request.query.get("offset", 0))
+        status = request.query.get("status")
+
+        if status and status not in {"pending", "declined", "expired"}:
+            return json_response({"error": "invalid status"}, status=400)
+
+        reqs = await get_join_requests(chat_id, limit=limit, offset=offset, status=status)
+        for r in reqs:
+            if r.get("request_date"):
+                r["request_date"] = r["request_date"].isoformat()
+            if r.get("created_at"):
+                r["created_at"] = r["created_at"].isoformat()
+
+        return json_response({
+            "chat_id": chat_id,
+            "status": status,
+            "count": len(reqs),
+            "requests": reqs,
+        })
+    except ValueError:
+        return json_response({"error": "invalid chat_id"}, status=400)
+    except Exception as e:
+        logger.error(f"API join requests error: {e}")
+        return json_response({"error": str(e)}, status=500)
+
+
 # ========== HTML Pages ==========
 
 @require_auth
@@ -497,6 +530,7 @@ def create_web_app() -> web.Application:
     app.router.add_get("/api/chats/{chat_id}/messages", api_chat_messages)
     app.router.add_get("/api/chats/{chat_id}/messages/daily", api_chat_messages_daily)
     app.router.add_get("/api/chats/{chat_id}/messages/export", api_chat_messages_export)
+    app.router.add_get("/api/chats/{chat_id}/join-requests", api_chat_join_requests)
     app.router.add_get("/api/dashboard", api_dashboard)
     app.router.add_post("/api/chats/{chat_id}/summary", api_chat_summary)
     app.router.add_get("/api/chats/{chat_id}/analytics", api_chat_analytics)
