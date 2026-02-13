@@ -772,7 +772,10 @@ class DashboardChat:
 
 
 async def get_dashboard_data() -> List[DashboardChat]:
-    """Получает данные для дашборда: чаты с полной статистикой."""
+    """Получает данные для дашборда: чаты с полной статистикой.
+
+    Optimized to reduce N+1 query problem.
+    """
     async with get_cursor() as cur:
         # Получаем чаты с базовой статистикой
         await cur.execute("""
@@ -788,47 +791,80 @@ async def get_dashboard_data() -> List[DashboardChat]:
         """)
         chats_data = await cur.fetchall()
 
-        result = []
-        for chat_row in chats_data:
-            chat_id = chat_row[0]
+        if not chats_data:
+            return []
 
-            # Последнее сообщение
-            await cur.execute("""
-                SELECT
-                    m.text,
-                    COALESCE(u.username, u.first_name, 'Unknown') as author,
-                    m.sent_at
-                FROM messages m
-                LEFT JOIN users u ON m.user_id = u.id
-                WHERE m.chat_id = %s AND m.text IS NOT NULL
-                ORDER BY m.sent_at DESC
-                LIMIT 1
-            """, (chat_id,))
-            last_msg = await cur.fetchone()
+        chat_ids = [row[0] for row in chats_data]
 
-            # Топ пользователей за неделю
-            await cur.execute("""
+        # 2. Fetch last messages for ALL chats
+        # Uses DISTINCT ON to get the latest message per chat
+        await cur.execute("""
+            SELECT DISTINCT ON (m.chat_id)
+                m.chat_id,
+                m.text,
+                COALESCE(u.username, u.first_name, 'Unknown') as author,
+                m.sent_at
+            FROM messages m
+            LEFT JOIN users u ON m.user_id = u.id
+            WHERE m.chat_id = ANY(%s) AND m.text IS NOT NULL
+            ORDER BY m.chat_id, m.sent_at DESC
+        """, (chat_ids,))
+
+        last_msgs_map = {}
+        for row in await cur.fetchall():
+            last_msgs_map[row[0]] = {
+                "text": row[1],
+                "author": row[2],
+                "sent_at": row[3]
+            }
+
+        # 3. Fetch top users for ALL chats (last 7 days)
+        # Uses ROW_NUMBER to limit to top 3 users per chat
+        await cur.execute("""
+            WITH user_stats AS (
                 SELECT
+                    m.chat_id,
                     COALESCE(u.username, u.first_name, 'Unknown') as name,
                     COUNT(*) as count
                 FROM messages m
                 JOIN users u ON m.user_id = u.id
-                WHERE m.chat_id = %s
+                WHERE m.chat_id = ANY(%s)
                   AND m.sent_at >= NOW() - INTERVAL '7 days'
-                GROUP BY u.id, u.username, u.first_name
-                ORDER BY count DESC
-                LIMIT 3
-            """, (chat_id,))
-            top_users = [{"name": row[0], "count": row[1]} for row in await cur.fetchall()]
+                GROUP BY m.chat_id, u.id, u.username, u.first_name
+            ),
+            ranked_users AS (
+                SELECT
+                    chat_id, name, count,
+                    ROW_NUMBER() OVER (PARTITION BY chat_id ORDER BY count DESC) as rn
+                FROM user_stats
+            )
+            SELECT chat_id, name, count
+            FROM ranked_users
+            WHERE rn <= 3
+        """, (chat_ids,))
+
+        top_users_map = {}
+        for row in await cur.fetchall():
+            c_id = row[0]
+            if c_id not in top_users_map:
+                top_users_map[c_id] = []
+            top_users_map[c_id].append({"name": row[1], "count": row[2]})
+
+        # Assemble the result
+        result = []
+        for chat_row in chats_data:
+            chat_id = chat_row[0]
+            last_msg = last_msgs_map.get(chat_id)
+            top_users = top_users_map.get(chat_id, [])
 
             result.append(DashboardChat(
-                id=chat_row[0],
+                id=chat_id,
                 title=chat_row[1],
                 total_messages=chat_row[2],
                 today_messages=chat_row[3],
-                last_message_text=last_msg[0] if last_msg else None,
-                last_message_author=last_msg[1] if last_msg else None,
-                last_message_at=last_msg[2] if last_msg else None,
+                last_message_text=last_msg["text"] if last_msg else None,
+                last_message_author=last_msg["author"] if last_msg else None,
+                last_message_at=last_msg["sent_at"] if last_msg else None,
                 top_users=top_users,
             ))
 
