@@ -1,0 +1,3 @@
+## 2024-05-23 - PostgreSQL N+1 Optimization with JSON Aggregation
+**Learning:** When fetching hierarchical data (e.g., chats -> last message, chats -> top users), standard ORM-like fetching or looping causes severe N+1 query issues. Using `LEFT JOIN LATERAL` combined with `json_agg` allows fetching complex nested structures in a single SQL query, dramatically reducing database round-trips.
+**Action:** Use `LEFT JOIN LATERAL` with `json_agg` for dashboard-like views where multiple independent related entities are needed for a list of parent entities. Always ensure `ORDER BY` is included inside `json_agg` if order matters.
