@@ -25,6 +25,9 @@ class Config:
     # Спец-функции под конкретные чаты
     vibecoder_chat_id: Optional[int] = None
 
+    # Чаты, заявки на вступление в которые записываются в БД
+    monitored_chat_ids: tuple = ()
+
     # Auto-decline join requests from "fresh" accounts.
     fresh_account_id_threshold: int = 7_000_000_000
     join_request_clean_interval_sec: int = 60
@@ -55,6 +58,11 @@ class Config:
             vibecoder_chat_id=int(os.getenv("VIBECODER_CHAT_ID"))
             if os.getenv("VIBECODER_CHAT_ID")
             else None,
+            monitored_chat_ids=tuple(
+                int(cid.strip())
+                for cid in os.getenv("MONITORED_CHAT_IDS", "").split(",")
+                if cid.strip()
+            ),
 
             fresh_account_id_threshold=int(os.getenv("FRESH_ACCOUNT_ID_THRESHOLD", "7000000000")),
             join_request_clean_interval_sec=int(os.getenv("JOIN_REQUEST_CLEAN_INTERVAL_SEC", "60")),

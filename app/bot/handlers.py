@@ -46,17 +46,20 @@ def _append_log_line(fp, line: str) -> None:
 
 
 async def join_request_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Collect chat join requests into DB (only for VIBECODER_CHAT_ID)."""
+    """Collect chat join requests into DB for monitored chats."""
     req = update.chat_join_request
     if not req:
         return
 
     cfg = get_config()
-    if not cfg.vibecoder_chat_id:
-        logger.warning("VIBECODER_CHAT_ID is not set; ignoring join request")
+    allowed_ids = cfg.monitored_chat_ids or (
+        (cfg.vibecoder_chat_id,) if cfg.vibecoder_chat_id else ()
+    )
+    if not allowed_ids:
+        logger.warning("No monitored chats configured; ignoring join request")
         return
 
-    if req.chat.id != cfg.vibecoder_chat_id:
+    if req.chat.id not in allowed_ids:
         return
 
     user = req.from_user
