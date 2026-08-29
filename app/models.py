@@ -218,46 +218,54 @@ def get_forward_chat_id(msg: Message) -> Optional[int]:
     return None
 
 
-async def save_user(user: User):
+async def save_user(user: User, cur=None):
     """Сохраняет или обновляет пользователя."""
-    async with get_cursor() as cur:
-        await cur.execute("""
-            INSERT INTO users (id, is_bot, first_name, last_name, username, language_code, is_premium, last_updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-            ON CONFLICT (id) DO UPDATE SET
-                first_name = EXCLUDED.first_name,
-                last_name = EXCLUDED.last_name,
-                username = EXCLUDED.username,
-                language_code = EXCLUDED.language_code,
-                is_premium = EXCLUDED.is_premium,
-                last_updated_at = NOW();
-        """, (
-            user.id,
-            user.is_bot,
-            user.first_name,
-            user.last_name,
-            user.username,
-            user.language_code,
-            getattr(user, 'is_premium', False) or False,
-        ))
+    if cur is None:
+        async with get_cursor() as cursor:
+            await save_user(user, cur=cursor)
+        return
+
+    await cur.execute("""
+        INSERT INTO users (id, is_bot, first_name, last_name, username, language_code, is_premium, last_updated_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            username = EXCLUDED.username,
+            language_code = EXCLUDED.language_code,
+            is_premium = EXCLUDED.is_premium,
+            last_updated_at = NOW();
+    """, (
+        user.id,
+        user.is_bot,
+        user.first_name,
+        user.last_name,
+        user.username,
+        user.language_code,
+        getattr(user, 'is_premium', False) or False,
+    ))
 
 
-async def save_chat(chat: Chat):
+async def save_chat(chat: Chat, cur=None):
     """Сохраняет или обновляет чат."""
-    async with get_cursor() as cur:
-        await cur.execute("""
-            INSERT INTO chats (id, type, title, username)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (id) DO UPDATE SET
-                title = EXCLUDED.title,
-                username = EXCLUDED.username,
-                last_updated_at = NOW();
-        """, (
-            chat.id,
-            chat.type,
-            chat.title,
-            chat.username,
-        ))
+    if cur is None:
+        async with get_cursor() as cursor:
+            await save_chat(chat, cur=cursor)
+        return
+
+    await cur.execute("""
+        INSERT INTO chats (id, type, title, username)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (id) DO UPDATE SET
+            title = EXCLUDED.title,
+            username = EXCLUDED.username,
+            last_updated_at = NOW();
+    """, (
+        chat.id,
+        chat.type,
+        chat.title,
+        chat.username,
+    ))
 
 
 async def save_message(msg: Message, is_edit: bool = False):
@@ -265,17 +273,18 @@ async def save_message(msg: Message, is_edit: bool = False):
     if not msg.from_user:
         return
     
-    # Сохраняем пользователя и чат
-    await save_user(msg.from_user)
-    await save_chat(msg.chat)
-    
     message_type = detect_message_type(msg)
     text_content = msg.text or None
     caption = msg.caption or None
     reply_to_id = msg.reply_to_message.message_id if msg.reply_to_message else None
     forward_chat_id = get_forward_chat_id(msg)
     
+    # Use a single connection for all operations
     async with get_cursor() as cur:
+        # Сохраняем пользователя и чат, используя тот же курсор
+        await save_user(msg.from_user, cur=cur)
+        await save_chat(msg.chat, cur=cur)
+
         if is_edit:
             # Обновляем существующее сообщение
             await cur.execute("""
