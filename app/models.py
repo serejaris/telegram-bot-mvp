@@ -218,9 +218,9 @@ def get_forward_chat_id(msg: Message) -> Optional[int]:
     return None
 
 
-async def save_user(user: User):
+async def save_user(user: User, cur: Optional[Any] = None):
     """Сохраняет или обновляет пользователя."""
-    async with get_cursor() as cur:
+    if cur:
         await cur.execute("""
             INSERT INTO users (id, is_bot, first_name, last_name, username, language_code, is_premium, last_updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
@@ -240,11 +240,14 @@ async def save_user(user: User):
             user.language_code,
             getattr(user, 'is_premium', False) or False,
         ))
+    else:
+        async with get_cursor() as cur:
+            await save_user(user, cur)
 
 
-async def save_chat(chat: Chat):
+async def save_chat(chat: Chat, cur: Optional[Any] = None):
     """Сохраняет или обновляет чат."""
-    async with get_cursor() as cur:
+    if cur:
         await cur.execute("""
             INSERT INTO chats (id, type, title, username)
             VALUES (%s, %s, %s, %s)
@@ -258,16 +261,18 @@ async def save_chat(chat: Chat):
             chat.title,
             chat.username,
         ))
+    else:
+        async with get_cursor() as cur:
+            await save_chat(chat, cur)
 
 
 async def save_message(msg: Message, is_edit: bool = False):
-    """Сохраняет сообщение в базу данных."""
+    """Сохраняет сообщение в базу данных.
+
+    Optimized to use a single database connection/transaction.
+    """
     if not msg.from_user:
         return
-    
-    # Сохраняем пользователя и чат
-    await save_user(msg.from_user)
-    await save_chat(msg.chat)
     
     message_type = detect_message_type(msg)
     text_content = msg.text or None
@@ -276,6 +281,10 @@ async def save_message(msg: Message, is_edit: bool = False):
     forward_chat_id = get_forward_chat_id(msg)
     
     async with get_cursor() as cur:
+        # Сохраняем пользователя и чат в той же транзакции
+        await save_user(msg.from_user, cur)
+        await save_chat(msg.chat, cur)
+
         if is_edit:
             # Обновляем существующее сообщение
             await cur.execute("""
