@@ -1,0 +1,3 @@
+## 2024-05-23 - N+1 Query Optimization with LATERAL Joins
+**Learning:** Using `LATERAL` joins combined with `json_agg` is a powerful pattern for solving "Top N per group" N+1 query problems in PostgreSQL. It allows fetching complex hierarchical data (like "last message" and "top 3 users" for each chat) in a single query, significantly reducing database round-trips.
+**Action:** Identify loops performing queries inside them (like iterating over chats to get details) and refactor them using CTEs and `LATERAL` joins. Ensure robust handling of JSON columns by checking for string types, as drivers or mocks might behave differently.
