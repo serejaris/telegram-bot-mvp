@@ -1,9 +1,11 @@
 """Инициализация и запуск Telegram бота."""
 
 import logging
-from telegram.ext import Application, ChatJoinRequestHandler, MessageHandler, filters
+from telegram.ext import Application, ChatJoinRequestHandler, MessageHandler, MessageReactionHandler, filters
 
-from .handlers import join_request_handler, message_handler, edited_message_handler, error_handler
+from .handlers import (
+    join_request_handler, message_handler, edited_message_handler, reaction_handler, error_handler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,9 @@ def create_bot(token: str) -> Application:
         )
     )
     
+    # Реакции на сообщения (бот должен быть админом чата)
+    application.add_handler(MessageReactionHandler(reaction_handler))
+
     # Обработчик ошибок
     application.add_error_handler(error_handler)
     
@@ -47,7 +52,10 @@ async def start_bot(application: Application):
     await application.start()
     await application.updater.start_polling(
         drop_pending_updates=True,
-        allowed_updates=["message", "edited_message", "chat_join_request"]
+        allowed_updates=[
+            "message", "edited_message", "chat_join_request",
+            "message_reaction", "message_reaction_count",
+        ]
     )
     
     logger.info("Bot is running")

@@ -6,7 +6,10 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
-from telegram import User, Chat, Message, MessageOriginChat, MessageOriginChannel
+from telegram import (
+    User, Chat, Message, MessageOriginChat, MessageOriginChannel,
+    MessageReactionUpdated, MessageReactionCountUpdated,
+)
 
 from .database import get_cursor, get_connection
 
@@ -73,6 +76,28 @@ CREATE TABLE IF NOT EXISTS join_requests (
     CONSTRAINT ck_join_requests_status CHECK (status IN ('pending','declined','expired')),
     FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Реакции по авторам (update message_reaction): одна строка на реакцию автора
+CREATE TABLE IF NOT EXISTS message_reaction_actors (
+    chat_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,
+    actor_id BIGINT NOT NULL,
+    reaction TEXT NOT NULL,
+    reacted_at TIMESTAMPTZ NOT NULL,
+
+    PRIMARY KEY (chat_id, message_id, actor_id, reaction)
+);
+
+-- Итоговые счётчики анонимных реакций (update message_reaction_count)
+CREATE TABLE IF NOT EXISTS message_reaction_counts (
+    chat_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,
+    reaction TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+
+    PRIMARY KEY (chat_id, message_id, reaction)
 );
 
 -- Индексы для оптимизации запросов (кроме message_type - создаётся после миграций)
@@ -311,6 +336,81 @@ async def save_message(msg: Message, is_edit: bool = False):
                 msg.date,
                 json.dumps(msg.to_dict()),
             ))
+
+
+def reaction_key(reaction) -> str:
+    """Строковый ключ реакции: эмодзи, custom:<id> или тип реакции."""
+    emoji = getattr(reaction, "emoji", None)
+    if emoji:
+        return emoji
+    custom_id = getattr(reaction, "custom_emoji_id", None)
+    if custom_id:
+        return f"custom:{custom_id}"
+    return str(getattr(reaction, "type", "unknown"))
+
+
+async def save_message_reaction(update: MessageReactionUpdated):
+    """Заменяет реакции автора на сообщение новым набором."""
+    actor = update.user or update.actor_chat
+    if not actor:
+        return
+
+    async with get_cursor() as cur:
+        await cur.execute("""
+            DELETE FROM message_reaction_actors
+            WHERE chat_id = %s AND message_id = %s AND actor_id = %s;
+        """, (update.chat.id, update.message_id, actor.id))
+        for reaction in update.new_reaction:
+            await cur.execute("""
+                INSERT INTO message_reaction_actors (chat_id, message_id, actor_id, reaction, reacted_at)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (update.chat.id, update.message_id, actor.id, reaction_key(reaction), update.date))
+
+
+async def save_message_reaction_count(update: MessageReactionCountUpdated):
+    """Заменяет счётчики анонимных реакций на сообщение."""
+    async with get_cursor() as cur:
+        await cur.execute("""
+            DELETE FROM message_reaction_counts
+            WHERE chat_id = %s AND message_id = %s;
+        """, (update.chat.id, update.message_id))
+        for rc in update.reactions:
+            await cur.execute("""
+                INSERT INTO message_reaction_counts (chat_id, message_id, reaction, count, updated_at)
+                VALUES (%s, %s, %s, %s, %s);
+            """, (update.chat.id, update.message_id, reaction_key(rc.type), rc.total_count, update.date))
+
+
+async def get_reactions_for_messages(chat_id: int, message_ids: List[int]) -> Dict[int, List[Dict[str, Any]]]:
+    """Реакции по сообщениям: счётчики анонимных реакций, иначе сумма по авторам."""
+    if not message_ids:
+        return {}
+    async with get_cursor() as cur:
+        await cur.execute("""
+            SELECT message_id, reaction, count FROM message_reaction_counts
+            WHERE chat_id = %s AND message_id = ANY(%s)
+            UNION ALL
+            SELECT a.message_id, a.reaction, COUNT(*) FROM message_reaction_actors a
+            WHERE a.chat_id = %s AND a.message_id = ANY(%s)
+              AND NOT EXISTS (
+                  SELECT 1 FROM message_reaction_counts c
+                  WHERE c.chat_id = a.chat_id AND c.message_id = a.message_id
+              )
+            GROUP BY a.message_id, a.reaction
+            ORDER BY 1, 3 DESC, 2;
+        """, (chat_id, message_ids, chat_id, message_ids))
+        result: Dict[int, List[Dict[str, Any]]] = {}
+        for message_id, reaction, count in await cur.fetchall():
+            result.setdefault(message_id, []).append({"reaction": reaction, "count": count})
+        return result
+
+
+async def attach_reactions(chat_id: int, messages: List[Dict[str, Any]]) -> None:
+    """Добавляет поле reactions в каждое сообщение (пустой список, если реакций нет)."""
+    reactions = await get_reactions_for_messages(chat_id, [m["message_id"] for m in messages])
+    for msg in messages:
+        msg["reactions"] = reactions.get(msg["message_id"], [])
 
 
 async def save_join_request_fields(

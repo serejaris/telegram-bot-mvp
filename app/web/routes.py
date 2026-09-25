@@ -21,6 +21,7 @@ from ..models import (
     get_chat_messages_by_date,
     get_chat_messages_by_date_range,
     get_chat_by_id,
+    attach_reactions,
     get_users,
     get_dashboard_data,
     get_join_requests,
@@ -199,6 +200,7 @@ async def api_chat_messages_daily(request: web.Request) -> web.Response:
             return json_response({"error": "date parameter required (YYYY-MM-DD)"}, status=400)
         
         messages = await get_chat_messages_by_date(chat_id, date_str)
+        await attach_reactions(chat_id, messages)
         
         # Сериализуем datetime
         for msg in messages:
@@ -258,6 +260,7 @@ async def api_chat_messages_export(request: web.Request) -> web.Response:
             return json_response({"error": "chat not found"}, status=404)
 
         messages = await get_chat_messages_by_date_range(chat_id, date_from, date_to)
+        await attach_reactions(chat_id, messages)
 
         # Serialize datetime
         for msg in messages:

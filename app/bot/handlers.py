@@ -12,6 +12,8 @@ from telegram.error import BadRequest, TelegramError
 from ..config import get_config
 from ..models import (
     save_message,
+    save_message_reaction,
+    save_message_reaction_count,
     save_join_request_fields,
     get_pending_fresh_join_requests,
     mark_join_requests_status,
@@ -127,6 +129,21 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
         )
     except Exception as e:
         logger.error(f"Failed to update message {msg.message_id}: {e}")
+
+
+async def reaction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик реакций: по авторам (message_reaction) и анонимные счётчики (message_reaction_count)."""
+    try:
+        if update.message_reaction:
+            r = update.message_reaction
+            await save_message_reaction(r)
+            logger.info(f"Saved reactions on message {r.message_id} in chat {r.chat.id}")
+        elif update.message_reaction_count:
+            r = update.message_reaction_count
+            await save_message_reaction_count(r)
+            logger.info(f"Saved reaction counts on message {r.message_id} in chat {r.chat.id}")
+    except Exception as e:
+        logger.error(f"Failed to save reactions: {e}")
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
