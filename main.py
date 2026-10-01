@@ -38,6 +38,9 @@ def setup_logging(level: str = "INFO"):
         level=getattr(logging, level.upper(), logging.INFO),
         handlers=[handler]
     )
+    # httpx на INFO пишет URL каждого запроса, а в URL Bot API лежит токен бота
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 async def main():
