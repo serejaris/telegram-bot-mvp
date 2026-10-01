@@ -7,7 +7,7 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
 from telegram import (
-    User, Chat, Message, MessageOriginChat, MessageOriginChannel,
+    User, Chat, Message, MessageEntity, MessageOriginChat, MessageOriginChannel,
     MessageReactionUpdated, MessageReactionCountUpdated,
 )
 
@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS messages (
     sent_at TIMESTAMPTZ NOT NULL,
     edited_at TIMESTAMPTZ,
     raw_message JSONB,
+    links JSONB,
 
     PRIMARY KEY (chat_id, message_id),
     FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
@@ -145,6 +146,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                    WHERE table_name='messages' AND column_name='edited_at') THEN
         ALTER TABLE messages ADD COLUMN edited_at TIMESTAMPTZ;
+    END IF;
+
+    -- messages: links (url/text_link из entities и caption_entities)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name='messages' AND column_name='links') THEN
+        ALTER TABLE messages ADD COLUMN links JSONB;
     END IF;
     
     -- users: is_premium
@@ -243,6 +250,21 @@ def get_forward_chat_id(msg: Message) -> Optional[int]:
     return None
 
 
+def extract_links(msg: Message) -> List[str]:
+    """Ссылки сообщения из entities и caption_entities: url (видимые) и text_link (скрытые).
+
+    Порядок сохраняется, дубликаты убираются.
+    """
+    link_types = [MessageEntity.URL, MessageEntity.TEXT_LINK]
+    parsed = {**msg.parse_entities(link_types), **msg.parse_caption_entities(link_types)}
+    links: List[str] = []
+    for entity, text in parsed.items():
+        url = entity.url if entity.type == MessageEntity.TEXT_LINK else text
+        if url and url not in links:
+            links.append(url)
+    return links
+
+
 async def save_user(user: User):
     """Сохраняет или обновляет пользователя."""
     async with get_cursor() as cur:
@@ -299,19 +321,21 @@ async def save_message(msg: Message, is_edit: bool = False):
     caption = msg.caption or None
     reply_to_id = msg.reply_to_message.message_id if msg.reply_to_message else None
     forward_chat_id = get_forward_chat_id(msg)
+    links = json.dumps(extract_links(msg))
     
     async with get_cursor() as cur:
         if is_edit:
             # Обновляем существующее сообщение
             await cur.execute("""
                 UPDATE messages 
-                SET text = %s, caption = %s, edited_at = %s, raw_message = %s
+                SET text = %s, caption = %s, edited_at = %s, raw_message = %s, links = %s
                 WHERE chat_id = %s AND message_id = %s;
             """, (
                 text_content,
                 caption,
                 msg.edit_date,
                 json.dumps(msg.to_dict()),
+                links,
                 msg.chat_id,
                 msg.message_id,
             ))
@@ -320,9 +344,9 @@ async def save_message(msg: Message, is_edit: bool = False):
             await cur.execute("""
                 INSERT INTO messages (
                     message_id, chat_id, user_id, message_type, text, caption,
-                    reply_to_message_id, forward_from_chat_id, sent_at, raw_message
+                    reply_to_message_id, forward_from_chat_id, sent_at, raw_message, links
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chat_id, message_id) DO NOTHING;
             """, (
                 msg.message_id,
@@ -335,6 +359,7 @@ async def save_message(msg: Message, is_edit: bool = False):
                 forward_chat_id,
                 msg.date,
                 json.dumps(msg.to_dict()),
+                links,
             ))
 
 
@@ -722,62 +747,9 @@ async def get_chat_by_id(chat_id: int) -> Optional[Dict[str, Any]]:
         }
 
 
-async def get_chat_messages_by_date(
-    chat_id: int,
-    date_str: str,  # format: YYYY-MM-DD
-) -> List[Dict[str, Any]]:
-    """Получает все сообщения чата за конкретный календарный день (UTC+3)."""
-    async with get_cursor() as cur:
-        # UTC+3: день начинается в 00:00 UTC+3 = 21:00 UTC предыдущего дня
-        await cur.execute("""
-            SELECT 
-                m.message_id,
-                m.message_type,
-                m.text,
-                m.caption,
-                m.sent_at,
-                m.edited_at,
-                m.reply_to_message_id,
-                u.id as user_id,
-                u.first_name,
-                u.last_name,
-                u.username
-            FROM messages m
-            LEFT JOIN users u ON m.user_id = u.id
-            WHERE m.chat_id = %s
-              AND (m.sent_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow')::date = %s::date
-            ORDER BY m.sent_at ASC
-        """, (chat_id, date_str))
-        
-        rows = await cur.fetchall()
-        return [
-            {
-                "message_id": row[0],
-                "message_type": row[1],
-                "text": row[2],
-                "caption": row[3],
-                "sent_at": row[4],
-                "edited_at": row[5],
-                "reply_to_message_id": row[6],
-                "user": {
-                    "id": row[7],
-                    "first_name": row[8],
-                    "last_name": row[9],
-                    "username": row[10],
-                } if row[7] else None
-            }
-            for row in rows
-        ]
-
-
-async def get_chat_messages_by_date_range(
-    chat_id: int,
-    date_from: str,  # format: YYYY-MM-DD
-    date_to: str,    # format: YYYY-MM-DD
-) -> List[Dict[str, Any]]:
-    """Получает все сообщения чата за диапазон дат (включительно, UTC+3)."""
-    async with get_cursor() as cur:
-        await cur.execute("""
+# Колонки сообщений для API daily/export. Название и username чата-источника пересылки
+# берутся из raw_message.forward_origin (channel -> chat, chat -> sender_chat).
+EXPORT_MESSAGE_SELECT = """
             SELECT
                 m.message_id,
                 m.message_type,
@@ -789,34 +761,73 @@ async def get_chat_messages_by_date_range(
                 u.id as user_id,
                 u.first_name,
                 u.last_name,
-                u.username
+                u.username,
+                m.forward_from_chat_id,
+                COALESCE(m.raw_message->'forward_origin'->'chat',
+                         m.raw_message->'forward_origin'->'sender_chat')->>'title',
+                COALESCE(m.raw_message->'forward_origin'->'chat',
+                         m.raw_message->'forward_origin'->'sender_chat')->>'username',
+                m.links
             FROM messages m
             LEFT JOIN users u ON m.user_id = u.id
+"""
+
+
+def export_message_row(row) -> Dict[str, Any]:
+    """Строка EXPORT_MESSAGE_SELECT -> сообщение API.
+
+    links = None у сообщений, сохранённых до появления колонки links.
+    """
+    return {
+        "message_id": row[0],
+        "message_type": row[1],
+        "text": row[2],
+        "caption": row[3],
+        "sent_at": row[4],
+        "edited_at": row[5],
+        "reply_to_message_id": row[6],
+        "user": {
+            "id": row[7],
+            "first_name": row[8],
+            "last_name": row[9],
+            "username": row[10],
+        } if row[7] else None,
+        "forward_from_chat_id": row[11],
+        "forward_from_chat_title": row[12],
+        "forward_from_chat_username": row[13],
+        "links": row[14],
+    }
+
+
+async def get_chat_messages_by_date(
+    chat_id: int,
+    date_str: str,  # format: YYYY-MM-DD
+) -> List[Dict[str, Any]]:
+    """Получает все сообщения чата за конкретный календарный день (UTC+3)."""
+    async with get_cursor() as cur:
+        # UTC+3: день начинается в 00:00 UTC+3 = 21:00 UTC предыдущего дня
+        await cur.execute(EXPORT_MESSAGE_SELECT + """
+            WHERE m.chat_id = %s
+              AND (m.sent_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow')::date = %s::date
+            ORDER BY m.sent_at ASC
+        """, (chat_id, date_str))
+        return [export_message_row(row) for row in await cur.fetchall()]
+
+
+async def get_chat_messages_by_date_range(
+    chat_id: int,
+    date_from: str,  # format: YYYY-MM-DD
+    date_to: str,    # format: YYYY-MM-DD
+) -> List[Dict[str, Any]]:
+    """Получает все сообщения чата за диапазон дат (включительно, UTC+3)."""
+    async with get_cursor() as cur:
+        await cur.execute(EXPORT_MESSAGE_SELECT + """
             WHERE m.chat_id = %s
               AND (m.sent_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow')::date >= %s::date
               AND (m.sent_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow')::date <= %s::date
             ORDER BY m.sent_at ASC
         """, (chat_id, date_from, date_to))
-
-        rows = await cur.fetchall()
-        return [
-            {
-                "message_id": row[0],
-                "message_type": row[1],
-                "text": row[2],
-                "caption": row[3],
-                "sent_at": row[4],
-                "edited_at": row[5],
-                "reply_to_message_id": row[6],
-                "user": {
-                    "id": row[7],
-                    "first_name": row[8],
-                    "last_name": row[9],
-                    "username": row[10],
-                } if row[7] else None
-            }
-            for row in rows
-        ]
+        return [export_message_row(row) for row in await cur.fetchall()]
 
 
 async def get_users(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:

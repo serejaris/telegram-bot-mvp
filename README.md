@@ -52,6 +52,9 @@
 | GET | `/api/chats` | Список чатов с количеством сообщений |
 | GET | `/api/chats/{chat_id}/messages` | Сообщения чата (`?limit=100&offset=0&type=text`) |
 | GET | `/api/chats/{chat_id}/messages/daily` | Сообщения за день (**обязательно**: `?date=YYYY-MM-DD`, UTC+3) |
+| GET | `/api/chats/{chat_id}/messages/export` | Сообщения за период (**обязательно**: `?from=YYYY-MM-DD&to=YYYY-MM-DD`, UTC+3) |
+
+Каждое сообщение в `daily`/`export` содержит, помимо текста и автора: `reactions`, `forward_from_chat_id`, `forward_from_chat_title`, `forward_from_chat_username` (источник пересылки из канала/чата, иначе `null`) и `links` — URL из entities/caption_entities (`url` и скрытые `text_link`). `links = null` у сообщений, сохранённых до появления колонки.
 
 > **Примечание:** `chat_id` для групп/супергрупп всегда отрицательный (например, `-1001234567890`)
 
