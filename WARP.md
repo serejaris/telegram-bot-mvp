@@ -83,6 +83,7 @@ tg-bot-scraper/
 - `forward_from_chat_id` — For forwards
 - `edited_at` — Tracks edits
 - `raw_message` — Full JSON for future analysis
+- `links` — JSONB list of URLs from `url`/`text_link` entities (text + caption); NULL for rows saved before the column existed
 
 ### Message Flow
 1. Bot receives update (message or edited_message)
